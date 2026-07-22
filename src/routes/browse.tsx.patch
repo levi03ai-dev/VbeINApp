@@ -1,0 +1,46 @@
+--- src/routes/browse.tsx
++++ src/routes/browse.tsx
+@@ -2,3 +2,3 @@
+ import { AnimatePresence, motion } from "framer-motion";
+-import { useState } from "react";
++import { useState, useEffect } from "react";
+ import { featuredAlbums, genres, madeForYou } from "@/lib/music-data";
+@@ -5,4 +5,5 @@
+ import { Header, HScroll } from "./index";
+ import { ScrollCarousel } from "@/components/music/ScrollCarousel";
+ import { SeeAllSheet } from "@/components/music/SeeAllSheet";
+ import { usePlayer } from "@/lib/player-context";
++import { getFeaturedAlbums, getCuratedPlaylists } from "@/lib/music-service";
++import type { Album, Playlist } from "@/lib/music-data";
+@@ -14,2 +15,19 @@
+ function BrowsePage() {
++  const [featured, setFeatured] = useState<Album[]>([]);
++  const [playlists, setPlaylists] = useState<Playlist[]>([]);
++
++  useEffect(() => {
++    async function loadData() {
++      try {
++        const [fAlbums, pLists] = await Promise.all([
++          getFeaturedAlbums(10),
++          getCuratedPlaylists(10)
++        ]);
++        if (fAlbums && fAlbums.length > 0) setFeatured(fAlbums);
++        if (pLists && pLists.length > 0) setPlaylists(pLists);
++      } catch (err) {
++        console.error("Failed to load browse data:", err);
++      }
++    }
++    loadData();
++  }, []);
++
+   const { setTrack, openNowPlaying } = usePlayer();
+@@ -44,3 +62,3 @@
+         <HScroll>
+-          {featuredAlbums.map((a) => (
++          {(featured.length > 0 ? featured : featuredAlbums).map((a) => (
+             <div key={a.id} className="w-[42vw] max-w-[170px] shrink-0">
+@@ -58,3 +76,3 @@
+         <HScroll>
+-          {madeForYou.map((p) => (
++          {(playlists.length > 0 ? playlists : madeForYou).map((p) => (
+             <div key={p.id} className="w-[40vw] max-w-[160px] shrink-0">

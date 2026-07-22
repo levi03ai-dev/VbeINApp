@@ -1,0 +1,44 @@
+--- src/lib/preview-audio.ts
++++ src/lib/preview-audio.ts
+@@ -34,3 +34,4 @@
+ let ctx: AudioContext | null = null;
+ let active: { stop: () => void } | null = null;
++let audioEl: HTMLAudioElement | null = null;
+ let analyser: AnalyserNode | null = null;
+@@ -62,3 +63,7 @@
+ export function stopPreview() {
++  if (audioEl) {
++    audioEl.pause();
++    audioEl = null;
++  }
+   if (active) {
+     active.stop();
+@@ -67,3 +72,27 @@
+ }
+ 
+-export function playPreview(trackId: string, opts?: { seconds?: number }) {
++export function playPreview(trackId: string, opts?: { seconds?: number; audioUrl?: string }) {
++  stopPreview();
++  
++  if (opts?.audioUrl) {
++    audioEl = new Audio(opts.audioUrl);
++    audioEl.crossOrigin = "anonymous";
++    audioEl.loop = false;
++    
++    const c = getCtx();
++    if (c) {
++      if (c.state === "suspended") c.resume().catch(() => {});
++      const source = c.createMediaElementSource(audioEl);
++      const analyserNode = getAnalyser();
++      if (analyserNode) {
++        source.connect(analyserNode);
++      } else {
++        source.connect(c.destination);
++      }
++    }
++    
++    audioEl.play().catch(console.error);
++    return;
++  }
++
+   const c = getCtx();

@@ -1,0 +1,42 @@
+--- src/lib/music-service.ts
++++ src/lib/music-service.ts
+@@ -140,2 +140,36 @@
+ }
+ 
++function mapITunesAlbum(it: any): import("./music-data").Album {
++  return {
++    id: String(it.collectionId || Math.random()),
++    title: it.collectionName || "Unknown Album",
++    artist: it.artistName || "Unknown Artist",
++    year: it.releaseDate ? new Date(it.releaseDate).getFullYear().toString() : new Date().getFullYear().toString(),
++    gradient: generateGradient(it.artistName || it.collectionName || String(it.collectionId)),
++    coverUrl: it.artworkUrl100 ? it.artworkUrl100.replace('100x100bb', '600x600bb') : "",
++  };
++}
++
++export async function getFeaturedAlbums(limit = 10): Promise<import("./music-data").Album[]> {
++  try {
++    const url = `https://itunes.apple.com/search?term=new+music&entity=album&limit=${limit}`;
++    const res = await fetch(url);
++    if (!res.ok) throw new Error("Network response not ok");
++    const data = await res.json();
++    if (data.results && Array.isArray(data.results) && data.results.length > 0) {
++      return data.results.map(mapITunesAlbum);
++    }
++    return [];
++  } catch (error) {
++    console.warn("iTunes featured albums fetch error:", error);
++    return [];
++  }
++}
++
++export async function getCuratedPlaylists(limit = 10): Promise<import("./music-data").Playlist[]> {
++  const albums = await getFeaturedAlbums(limit);
++  return albums.map(a => ({
++    id: a.id,
++    title: a.title,
++    subtitle: a.artist,
++    gradient: a.gradient,
++    coverUrl: a.coverUrl
++  }));
++}

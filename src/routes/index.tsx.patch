@@ -1,0 +1,37 @@
+--- src/routes/index.tsx
++++ src/routes/index.tsx
+@@ -14,3 +14,3 @@
+ import { Haptics } from "@/lib/haptics";
+-import { getPopularTracks } from "@/lib/music-service";
++import { getPopularTracks, getFeaturedAlbums, getCuratedPlaylists } from "@/lib/music-service";
+ import { SeeAllSheet } from "@/components/music/SeeAllSheet";
+@@ -36,2 +36,4 @@
+   const [popularTracks, setPopularTracks] = useState<Track[]>([]);
++  const [featured, setFeatured] = useState<Album[]>([]);
++  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+   const [activeSeeAll, setActiveSeeAll] = useState<{
+@@ -43,10 +45,15 @@
+   useEffect(() => {
+-    async function loadPopular() {
++    async function loadData() {
+       try {
+-        const tracks = await getPopularTracks(15);
+-        if (tracks && tracks.length > 0) {
+-          setPopularTracks(tracks);
+-        }
++        const [tracks, fAlbums, pLists] = await Promise.all([
++          getPopularTracks(15),
++          getFeaturedAlbums(10),
++          getCuratedPlaylists(10)
++        ]);
++        if (tracks && tracks.length > 0) setPopularTracks(tracks);
++        if (fAlbums && fAlbums.length > 0) setFeatured(fAlbums);
++        if (pLists && pLists.length > 0) setPlaylists(pLists);
+       } catch (err) {
+-        console.error("Failed to load popular tracks for homepage:", err);
++        console.error("Failed to load homepage data:", err);
+       }
+     }
+-    loadPopular();
++    loadData();
+   }, []);
