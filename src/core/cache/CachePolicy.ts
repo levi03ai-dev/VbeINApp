@@ -1,0 +1,5 @@
+export enum CachePolicy {
+  MEMORY_ONLY = "MEMORY_ONLY",
+  DISK_ONLY = "DISK_ONLY",
+  MEMORY_FIRST = "MEMORY_FIRST",
+}

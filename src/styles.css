@@ -40,28 +40,29 @@
 
 :root {
   --radius: 0.875rem;
-  --background: oklch(0.14 0.005 20);
-  --foreground: oklch(0.985 0.002 20);
-  --surface: oklch(0.19 0.007 20);
-  --surface-elev: oklch(0.235 0.008 20);
-  --card: oklch(0.19 0.007 20);
-  --card-foreground: oklch(0.985 0.002 20);
-  --popover: oklch(0.19 0.007 20);
-  --popover-foreground: oklch(0.985 0.002 20);
-  --primary: oklch(0.985 0.002 20);
-  --primary-foreground: oklch(0.14 0.005 20);
-  --secondary: oklch(0.24 0.008 20);
-  --secondary-foreground: oklch(0.985 0.002 20);
-  --muted: oklch(0.22 0.007 20);
-  --muted-foreground: oklch(0.68 0.015 20);
-  --accent: oklch(0.68 0.22 12);
-  --accent-foreground: oklch(0.985 0.002 20);
-  --accent-pink: oklch(0.72 0.22 6);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.68 0.22 12 / 60%);
+  /* High-Contrast Warm Sandstone Palette */
+  --background: oklch(0.15 0.015 55);
+  --foreground: oklch(0.97 0.012 65);
+  --surface: oklch(0.2 0.018 55);
+  --surface-elev: oklch(0.25 0.022 55);
+  --card: oklch(0.2 0.018 55);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.2 0.018 55);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.97 0.012 65);
+  --primary-foreground: oklch(0.15 0.015 55);
+  --secondary: oklch(0.26 0.022 55);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.24 0.018 55);
+  --muted-foreground: oklch(0.78 0.025 65);
+  --accent: oklch(0.72 0.18 48);
+  --accent-foreground: oklch(0.15 0.015 55);
+  --accent-pink: oklch(0.75 0.2 25);
+  --destructive: oklch(0.62 0.22 28);
+  --destructive-foreground: oklch(0.98 0.003 65);
+  --border: oklch(0.97 0.012 65 / 12%);
+  --input: oklch(0.97 0.012 65 / 16%);
+  --ring: oklch(0.72 0.18 48 / 60%);
 }
 
 html,
@@ -118,7 +119,6 @@ body {
 
 @utility album-shadow {
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
     0 20px 40px -12px rgba(0, 0, 0, 0.55),
     0 8px 16px -8px rgba(0, 0, 0, 0.5);
 }

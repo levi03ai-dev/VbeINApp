@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { getAnalyser } from "@/lib/preview-audio";
+import { usePlayerSync } from "@/lib/player-context";
 
 export function AudioVisualizer({
-  isPlaying,
+  isPlaying: initialIsPlaying,
   colorClass = "bg-accent-pink",
 }: {
   isPlaying: boolean;
@@ -10,6 +11,11 @@ export function AudioVisualizer({
 }) {
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
   const animationRef = useRef<number | null>(null);
+
+  // Subscribe to global sync event emitter for zero-lag state synchronization
+  const syncEvent = usePlayerSync();
+  const activePlaying = syncEvent ? syncEvent.isPlaying : initialIsPlaying;
+  const isBuffering = syncEvent ? syncEvent.isBuffering : false;
 
   useEffect(() => {
     const bars = barsRef.current;
@@ -21,7 +27,7 @@ export function AudioVisualizer({
     const tick = () => {
       const analyser = getAnalyser();
       let hasRealAudio = false;
-      if (analyser && isPlaying) {
+      if (analyser && activePlaying) {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let j = 0; j < dataArray.length; j++) sum += dataArray[j];
@@ -53,8 +59,11 @@ export function AudioVisualizer({
         if (!bar) continue;
 
         let value = 0;
-        if (isPlaying) {
-          if (hasRealAudio) {
+        if (activePlaying) {
+          if (isBuffering) {
+            // Gentle loading pulse when buffering
+            value = 0.2 + Math.sin(timeSec * 6 + i) * 0.15;
+          } else if (hasRealAudio) {
             // We have real frequency data! Map bar index to frequency range
             const binIndex = Math.min(i * 3 + 1, dataArray.length - 1);
             const freqVal = dataArray[binIndex] / 255;
@@ -101,7 +110,7 @@ export function AudioVisualizer({
 
         // Fast attack (rising), slower decay (falling) for professional physical movement
         const isRising = targetHeight > currentScale;
-        const lerpFactor = isPlaying ? (isRising ? 0.6 : 0.2) : 0.12;
+        const lerpFactor = activePlaying ? (isRising ? 0.6 : 0.2) : 0.12;
         const nextScale = currentScale + (targetHeight - currentScale) * lerpFactor;
 
         bar.style.transform = `scaleY(${nextScale})`;
@@ -118,7 +127,7 @@ export function AudioVisualizer({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [activePlaying, isBuffering]);
 
   return (
     <div className="flex items-end gap-[2px] h-[13px] px-1 shrink-0" aria-hidden="true">

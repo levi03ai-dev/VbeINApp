@@ -1,18 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { Clock, Mic, Play, Search as SearchIcon, X } from "lucide-react";
+import { Clock, Mic, Play, Search as SearchIcon, X, TrendingUp } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
-import { genres, topCharts, featuredAlbums } from "@/lib/music-data";
+import { genres, topCharts, featuredAlbums, getCoverUrl } from "@/lib/music-data";
 import { usePlayer } from "@/lib/player-context";
 import { searchTracks, getTracksByGenre } from "@/lib/music-service";
 import type { Track } from "@/lib/music-data";
 import { TrackRow } from "@/components/music/cards";
+import { CoverImage } from "@/components/music/CoverImage";
 import { TrackRowSkeleton } from "@/components/music/CardSkeletons";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
     meta: [
-      { title: "Search — Sonora" },
+      { title: "Search — VibeIN" },
       { name: "description", content: "Search artists, songs, albums, and playlists." },
     ],
   }),
@@ -49,6 +50,29 @@ function Search() {
   const [cat, setCat] = useState<Category>("top");
   const [apiResults, setApiResults] = useState<Track[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    const allTrends = [
+      "Animal",
+      "Arijit Singh",
+      "Vishal Mishra",
+      "Bollywood Hits",
+      "Punjabi",
+      "Pritam",
+      "Shreya Ghoshal",
+      "Diljit Dosanjh",
+      "Lofi",
+      "Party",
+      "90s Romance",
+      "Karan Aujla",
+      "The Weeknd",
+      "Taylor Swift",
+    ];
+    // Pick 5 random
+    const shuffled = [...allTrends].sort(() => 0.5 - Math.random());
+    setTrendingSearches(shuffled.slice(0, 5));
+  }, []);
   const [recentSearches, setRecentSearches] = useState<string[]>([
     "Arijit Singh",
     "Kesariya",
@@ -58,7 +82,7 @@ function Search() {
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("sonora_recent_searches");
+      const saved = localStorage.getItem("melody_stream_recent_searches");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -80,7 +104,7 @@ function Search() {
       const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
       const next = [trimmed, ...filtered].slice(0, 10);
       try {
-        localStorage.setItem("sonora_recent_searches", JSON.stringify(next));
+        localStorage.setItem("melody_stream_recent_searches", JSON.stringify(next));
       } catch (e) {
         console.error("Failed to save recent search", e);
       }
@@ -92,7 +116,7 @@ function Search() {
     setRecentSearches((prev) => {
       const next = prev.filter((item) => item.toLowerCase() !== term.toLowerCase());
       try {
-        localStorage.setItem("sonora_recent_searches", JSON.stringify(next));
+        localStorage.setItem("melody_stream_recent_searches", JSON.stringify(next));
       } catch (e) {
         console.error("Failed to remove recent search", e);
       }
@@ -103,7 +127,7 @@ function Search() {
   const clearAllRecent = () => {
     setRecentSearches([]);
     try {
-      localStorage.removeItem("sonora_recent_searches");
+      localStorage.removeItem("melody_stream_recent_searches");
     } catch (e) {
       console.error("Failed to clear recent searches", e);
     }
@@ -122,9 +146,6 @@ function Search() {
       try {
         const tracks = await searchTracks(trimmed, 30);
         setApiResults(tracks);
-        if (tracks.length > 0) {
-          saveRecentSearch(trimmed);
-        }
       } catch (err) {
         console.error("Failed to fetch search results:", err);
       } finally {
@@ -138,11 +159,20 @@ function Search() {
   const needle = q.trim().toLowerCase();
   const results = useMemo(() => {
     if (!needle) return null;
+    const rawSongs =
+      apiResults.length > 0
+        ? apiResults
+        : topCharts.filter((t) => (t.title + t.artist + t.album).toLowerCase().includes(needle));
+
+    const seenSongIds = new Set<string>();
+    const songs = rawSongs.filter((t) => {
+      if (!t || !t.id || seenSongIds.has(t.id)) return false;
+      seenSongIds.add(t.id);
+      return true;
+    });
+
     return {
-      songs:
-        apiResults.length > 0
-          ? apiResults
-          : topCharts.filter((t) => (t.title + t.artist + t.album).toLowerCase().includes(needle)),
+      songs,
       albums: featuredAlbums.filter((a) => (a.title + a.artist).toLowerCase().includes(needle)),
       artists: artists.filter((a) => a.name.toLowerCase().includes(needle)),
     };
@@ -173,7 +203,28 @@ function Search() {
               <X className="h-4 w-4" />
             </button>
           ) : (
-            <Mic className="h-4 w-4 text-muted-foreground/50" />
+            <button
+              onClick={() => {
+                const win = window as unknown as {
+                  SpeechRecognition?: new () => any;
+                  webkitSpeechRecognition?: new () => any;
+                };
+                const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+                if (SpeechRecognition) {
+                  const recognition = new SpeechRecognition();
+                  recognition.onresult = (event: { results: { transcript: string }[][] }) => {
+                    const transcript = event.results[0][0].transcript;
+                    setQ(transcript);
+                    saveRecentSearch(transcript);
+                  };
+                  recognition.start();
+                } else {
+                  alert("Speech recognition is not supported in this browser.");
+                }
+              }}
+            >
+              <Mic className="h-4 w-4 text-muted-foreground/50 hover:text-foreground transition-colors" />
+            </button>
           )}
         </div>
 
@@ -246,17 +297,22 @@ function Search() {
                           key={a.name}
                           name={a.name}
                           gradient={a.gradient}
-                          onPlay={() => {
+                          onPlay={async () => {
                             saveRecentSearch(a.name);
-                            setTrack({
-                              id: a.name + "-top",
-                              title: "Ultrawave",
-                              artist: a.name,
-                              album: "Top Hits",
-                              duration: "3:34",
-                              gradient: a.gradient,
-                            });
-                            openNowPlaying();
+                            setIsSearching(true);
+                            try {
+                              const { searchTracks } = await import("@/lib/music-service");
+                              const tracks = await searchTracks(a.name, 20);
+                              if (tracks.length > 0) {
+                                setQueue(tracks);
+                                setTrack(tracks[0]);
+                                openNowPlaying();
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setIsSearching(false);
+                            }
                           }}
                         />
                       ))}
@@ -272,17 +328,32 @@ function Search() {
                           title={a.title}
                           artist={a.artist}
                           gradient={a.gradient}
-                          onPlay={() => {
+                          onPlay={async () => {
                             saveRecentSearch(a.title);
-                            setTrack({
-                              id: a.id,
-                              title: a.title,
-                              artist: a.artist,
-                              album: a.title,
-                              duration: "3:42",
-                              gradient: a.gradient,
-                            });
-                            openNowPlaying();
+                            setIsSearching(true);
+                            try {
+                              const { searchTracks } = await import("@/lib/music-service");
+                              const tracks = await searchTracks(a.title, 20);
+                              if (tracks.length > 0) {
+                                setQueue(tracks);
+                                setTrack(tracks[0]);
+                                openNowPlaying();
+                              } else {
+                                setTrack({
+                                  id: a.id,
+                                  title: a.title,
+                                  artist: a.artist,
+                                  album: a.title,
+                                  duration: "3:42",
+                                  gradient: a.gradient,
+                                });
+                                openNowPlaying();
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setIsSearching(false);
+                            }
                           }}
                         />
                       ))}
@@ -320,6 +391,31 @@ function Search() {
             transition={{ duration: 0.65, ease: [0.32, 0.72, 0, 1] }}
           >
             {/* Recent Searches */}
+            {/* Trending Searches */}
+            {trendingSearches.length > 0 && (
+              <section className="mt-5 px-4">
+                <h2 className="text-[14px] font-semibold tracking-tight text-foreground/90 flex items-center gap-1.5 mb-2.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-accent-pink" />
+                  Trending Searches
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {trendingSearches.map((term) => (
+                    <div
+                      key={term}
+                      onClick={() => {
+                        setQ(term);
+                        saveRecentSearch(term);
+                      }}
+                      className="group flex items-center gap-1.5 rounded-full bg-surface/50 px-3 py-1 text-[13px] text-foreground/90 hover:bg-surface/80 transition-all cursor-pointer border border-accent-pink/10"
+                    >
+                      <span>{term}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Recent Searches */}
             {recentSearches.length > 0 && (
               <section className="mt-5 px-4">
                 <div className="flex items-center justify-between mb-2.5">
@@ -342,7 +438,7 @@ function Search() {
                         setQ(term);
                         saveRecentSearch(term);
                       }}
-                      className="group flex items-center gap-1.5 rounded-full border border-white/10 bg-surface/50 px-3 py-1 text-[13px] text-foreground/90 hover:bg-surface/80 hover:border-white/20 transition-all cursor-pointer"
+                      className="group flex items-center gap-1.5 rounded-full bg-surface/50 px-3 py-1 text-[13px] text-foreground/90 hover:bg-surface/80 transition-all cursor-pointer"
                     >
                       <Clock className="h-3 w-3 text-muted-foreground/60" />
                       <span>{term}</span>
@@ -351,7 +447,7 @@ function Search() {
                           e.stopPropagation();
                           removeRecentSearch(term);
                         }}
-                        className="ml-0.5 rounded-full p-0.5 text-muted-foreground/50 hover:bg-white/10 hover:text-foreground transition-colors"
+                        className="ml-0.5 rounded-full p-0.5 text-muted-foreground/50 hover:bg-foreground/10 hover:text-foreground transition-colors"
                         title="Remove"
                       >
                         <X className="h-3 w-3" />
@@ -361,75 +457,6 @@ function Search() {
                 </div>
               </section>
             )}
-
-            {/* Genres */}
-            <section className="mt-6 px-4">
-              <h2 className="text-[16px] font-semibold tracking-tight text-foreground/90 mb-3">
-                Genres & Categories
-              </h2>
-              <div className="grid grid-cols-2 gap-3.5 mt-2 grid-flow-row-dense">
-                {genres.map((g, i) => {
-                  const isWide = i % 5 === 0;
-                  return (
-                    <motion.button
-                      key={g.id}
-                      initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      transition={{ delay: i * 0.03, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={async () => {
-                        saveRecentSearch(g.name);
-                        try {
-                          const tracks = await getTracksByGenre(g.name, 20);
-                          if (tracks.length > 0) {
-                            setQueue(tracks);
-                            setTrack(tracks[0]);
-                            openNowPlaying();
-                          } else {
-                            // Fallback
-                            setTrack({
-                              id: g.id + "-station",
-                              title: `${g.name} Mix`,
-                              artist: "Sonora Station",
-                              album: `${g.name} Radio`,
-                              duration: "3:45",
-                              gradient: g.gradient,
-                              coverUrl: g.coverUrl,
-                            });
-                            openNowPlaying();
-                          }
-                        } catch {
-                          setTrack({
-                            id: g.id + "-station",
-                            title: `${g.name} Mix`,
-                            artist: "Sonora Station",
-                            album: `${g.name} Radio`,
-                            duration: "3:45",
-                            gradient: g.gradient,
-                            coverUrl: g.coverUrl,
-                          });
-                          openNowPlaying();
-                        }
-                      }}
-                      className={`relative overflow-hidden rounded-xl text-left album-shadow border border-white/10 cursor-pointer transition-all bg-cover bg-center ${
-                        isWide ? "col-span-2 aspect-[21/9]" : "col-span-1 aspect-square"
-                      }`}
-                      style={
-                        g.coverUrl
-                          ? { backgroundImage: `url(${g.coverUrl})` }
-                          : { background: g.gradient }
-                      }
-                    >
-                      <div className="absolute inset-0 bg-black/35 z-0" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-                      <span className="absolute bottom-3.5 left-3.5 text-[14px] font-semibold tracking-tight text-white z-20 drop-shadow-sm">
-                        {g.name}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </section>
           </motion.div>
         )}
       </AnimatePresence>
@@ -464,7 +491,7 @@ function ArtistCard({
       className="flex w-[84px] shrink-0 flex-col items-center gap-2 text-center"
     >
       <div
-        className="h-20 w-20 rounded-full album-shadow border border-white/5 relative overflow-hidden"
+        className="h-20 w-20 rounded-full album-shadow relative overflow-hidden"
         style={{ background: gradient }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(100%_50%_at_0%_0%,rgba(255,255,255,0.15),transparent_60%)]" />
@@ -490,7 +517,7 @@ function AlbumResultCard({
   return (
     <motion.button whileTap={{ scale: 0.98 }} onClick={onPlay} className="text-left w-full">
       <div
-        className="relative aspect-square overflow-hidden rounded-xl album-shadow border border-white/5"
+        className="relative aspect-square overflow-hidden rounded-xl album-shadow"
         style={{ background: gradient }}
       >
         <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/5" />

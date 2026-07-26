@@ -7,7 +7,95 @@ export type Track = {
   gradient: string;
   coverUrl?: string;
   audioUrl?: string;
+  language?: string;
+  tempo?: string;
 };
+
+export function getCoverUrl(url?: string): string {
+  if (!url) return "";
+  if (url.startsWith("/api/proxy/image") || url.startsWith("data:") || url.startsWith("/")) {
+    return url;
+  }
+  if (url.startsWith("http")) {
+    return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+export function normalizeSongInfo(
+  title?: string,
+  artist?: string,
+): { cleanTitle: string; cleanArtist: string; key: string } {
+  const rawTitle = (title || "").trim();
+  let rawArtist = (artist || "").trim();
+
+  // Strip common YouTube uploader / topic / VEVO suffixes
+  rawArtist = rawArtist
+    .replace(/\s*-\s*topic$/i, "")
+    .replace(/vevo$/i, "")
+    .trim();
+
+  // Extract primary artist if album name is appended via '—' or ' - '
+  let primaryArtist = rawArtist;
+  if (primaryArtist.includes("—") || primaryArtist.includes(" - ")) {
+    primaryArtist = primaryArtist.split(/—|\s-\s/)[0].trim();
+  }
+  // Extract primary artist if comma or ampersand or ft/feat separated
+  primaryArtist = primaryArtist.split(/[,&/]|feat\.|ft\./i)[0].trim();
+
+  // Clean title: If title starts with Artist Name e.g. "Miley Cyrus - Flowers"
+  let cleanTitle = rawTitle;
+  if (
+    (cleanTitle.includes("-") || cleanTitle.includes("—") || cleanTitle.includes(":")) &&
+    primaryArtist
+  ) {
+    const parts = cleanTitle.split(/[-—:]/);
+    if (parts.length >= 2) {
+      const p0 = parts[0]
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+      const artNorm = primaryArtist.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (p0 && artNorm && (p0.includes(artNorm) || artNorm.includes(p0))) {
+        cleanTitle = parts.slice(1).join("-").trim();
+      }
+    }
+  }
+
+  // Strip audio/video/lyrics clutter
+  cleanTitle = cleanTitle
+    .replace(/\(official\s*(music\s*)?(video|audio|lyric|lyrics)?\)/gi, "")
+    .replace(/\[official\s*(music\s*)?(video|audio|lyric|lyrics)?\]/gi, "")
+    .replace(/\((hd|4k|audio|lyric|lyrics|remastered|video|single|version)\)/gi, "")
+    .replace(/\[(hd|4k|audio|lyric|lyrics|remastered|video|single|version)\]/gi, "")
+    .replace(/\(feat\..*?\)/gi, "")
+    .replace(/\[feat\..*?\]/gi, "")
+    .replace(/\(ft\..*?\)/gi, "")
+    .replace(/\[ft\..*?\]/gi, "")
+    .replace(/feat\..*/gi, "")
+    .replace(/ft\..*/gi, "")
+    .trim();
+
+  const normTitle = cleanTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const normArtist = primaryArtist
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const key = `${normTitle}::${normArtist}`;
+
+  return {
+    cleanTitle: cleanTitle || rawTitle,
+    cleanArtist: primaryArtist || rawArtist,
+    key,
+  };
+}
 
 export type Album = {
   id: string;
@@ -41,7 +129,8 @@ export const featuredAlbums: Album[] = [
     year: "2024",
     gradient: g("#f97316", "#dc2626"),
     tag: "Trending #1",
-    coverUrl: "https://c.saavncdn.com/264/Saiyaara-Hindi-2024-20240212130005-500x500.jpg",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/c6/6a/a3/c66aa366-4522-14b8-c629-7cfee5422fc0/Saiyaara_Album_Cover.jpg/600x600bb.jpg",
   },
   {
     id: "a2",
@@ -51,7 +140,7 @@ export const featuredAlbums: Album[] = [
     gradient: g("#ff6b35", "#f7931e"),
     tag: "Blockbuster",
     coverUrl:
-      "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg",
   },
   {
     id: "a3",
@@ -60,7 +149,8 @@ export const featuredAlbums: Album[] = [
     year: "2023",
     gradient: g("#e11d48", "#9333ea"),
     tag: "Chartbuster",
-    coverUrl: "https://c.saavncdn.com/026/Chaleya-From-Jawan-Hindi-2023-20230814124317-500x500.jpg",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/1e/ff/32/1eff3216-190d-6fd9-8f68-acbba846e6ee/8903431956026_cover.jpg/600x600bb.jpg",
   },
   {
     id: "a4",
@@ -69,7 +159,8 @@ export const featuredAlbums: Album[] = [
     year: "2023",
     gradient: g("#b91c1c", "#18181b"),
     tag: "Top Hit",
-    coverUrl: "https://c.saavncdn.com/092/ANIMAL-Hindi-2023-20231124191136-500x500.jpg",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/db/ad/5e/dbad5e8b-0bee-d962-92d4-021c90e375ac/8902894362092_cover.jpg/600x600bb.jpg",
   },
   {
     id: "a5",
@@ -79,7 +170,7 @@ export const featuredAlbums: Album[] = [
     gradient: g("#eab308", "#ca8a04"),
     tag: "Punjabi Gold",
     coverUrl:
-      "https://c.saavncdn.com/282/Tauba-Tauba-From-Bad%20Newz-Hindi-2024-20240702111812-500x500.jpg",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/d3/08/bc/d308bc6a-20e1-6532-d933-35d1b429210e/5054197755538.jpg/600x600bb.jpg",
   },
   {
     id: "a6",
@@ -89,7 +180,7 @@ export const featuredAlbums: Album[] = [
     gradient: g("#3a7bd5", "#3a6073"),
     tag: "Global Hit",
     coverUrl:
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/b5/92/bb/b592bb72-52e3-e756-9b26-9f56d08f47ab/16UMGIM67864.rgb.jpg/600x600bb.jpg",
   },
 ];
 
@@ -101,7 +192,7 @@ export const madeForYou: Playlist[] = [
     gradient: g("#f97316", "#dc2626"),
     tracks: 50,
     coverUrl:
-      "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg",
   },
   {
     id: "p2",
@@ -110,7 +201,7 @@ export const madeForYou: Playlist[] = [
     gradient: g("#eab308", "#ca8a04"),
     tracks: 45,
     coverUrl:
-      "https://c.saavncdn.com/282/Tauba-Tauba-From-Bad%20Newz-Hindi-2024-20240702111812-500x500.jpg",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/d3/08/bc/d308bc6a-20e1-6532-d933-35d1b429210e/5054197755538.jpg/600x600bb.jpg",
   },
   {
     id: "p3",
@@ -118,7 +209,8 @@ export const madeForYou: Playlist[] = [
     subtitle: "Soft romantic Hindi songs",
     gradient: g("#0c2340", "#5cbdb9"),
     tracks: 68,
-    coverUrl: "https://c.saavncdn.com/264/Saiyaara-Hindi-2024-20240212130005-500x500.jpg",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/c6/6a/a3/c66aa366-4522-14b8-c629-7cfee5422fc0/Saiyaara_Album_Cover.jpg/600x600bb.jpg",
   },
   {
     id: "p4",
@@ -126,7 +218,8 @@ export const madeForYou: Playlist[] = [
     subtitle: "All time hit romantic tracks",
     gradient: g("#0284c7", "#1e1b4b"),
     tracks: 40,
-    coverUrl: "https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/bb/23/ee/bb23eeed-0c35-4f1d-2b11-485622777ae4/8902894353007_cover.jpg/600x600bb.jpg",
   },
   {
     id: "p5",
@@ -135,7 +228,7 @@ export const madeForYou: Playlist[] = [
     gradient: g("#ff6b6b", "#c44569"),
     tracks: 60,
     coverUrl:
-      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/a6/6e/bf/a66ebf79-5008-8948-b352-a790fc87446b/19UM1IM04638.rgb.jpg/600x600bb.jpg",
   },
 ];
 
@@ -204,7 +297,7 @@ export const genres = [
     name: "Electronic & EDM",
     gradient: g("#0f1b3d", "#3b6fa0"),
     coverUrl:
-      "https://images.unsplash.com/photo-1571266028243-3716f02d2d2e?w=600&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600&auto=format&fit=crop&q=80",
   },
   {
     id: "g6",
@@ -273,97 +366,103 @@ export const genres = [
 
 export const topCharts: Track[] = [
   {
-    id: "ind_0",
-    title: "Saiyaara",
-    artist: "Tanishk Bagchi, Faheem Abdullah, Arslan Nizami",
-    album: "Saiyaara",
-    duration: "4:12",
-    gradient: g("#f97316", "#dc2626"),
-    coverUrl: "https://c.saavncdn.com/264/Saiyaara-Hindi-2024-20240212130005-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Saiyaara%20Tanishk%20Bagchi",
-  },
-  {
-    id: "ind_1",
-    title: "Kesariya",
-    artist: "Pritam, Arijit Singh, Amitabh Bhattacharya",
-    album: "Brahmastra",
-    duration: "4:28",
-    gradient: g("#ff6b35", "#f7931e"),
-    coverUrl:
-      "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Kesariya%20Arijit%20Singh",
-  },
-  {
-    id: "ind_2",
-    title: "Chaleya",
-    artist: "Anirudh Ravichander, Arijit Singh, Shilpa Rao",
-    album: "Jawan",
+    id: "global_1",
+    title: "Blinding Lights",
+    artist: "The Weeknd",
+    album: "After Hours",
     duration: "3:20",
-    gradient: g("#e11d48", "#9333ea"),
-    coverUrl: "https://c.saavncdn.com/026/Chaleya-From-Jawan-Hindi-2023-20230814124317-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Chaleya%20Arijit%20Singh",
-  },
-  {
-    id: "ind_3",
-    title: "Tum Hi Ho",
-    artist: "Mithoon, Arijit Singh",
-    album: "Aashiqui 2",
-    duration: "4:22",
-    gradient: g("#0284c7", "#1e1b4b"),
-    coverUrl: "https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Tum%20Hi%20Ho%20Arijit%20Singh",
-  },
-  {
-    id: "ind_4",
-    title: "Apna Bana Le",
-    artist: "Sachin-Jigar, Arijit Singh",
-    album: "Bhediya",
-    duration: "4:21",
-    gradient: g("#0d9488", "#111827"),
+    gradient: g("#00c6ff", "#0072ff"),
     coverUrl:
-      "https://c.saavncdn.com/821/Apna-Bana-Le-From-Bhediya-Hindi-2022-20221107123301-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Apna%20Bana%20Le%20Arijit%20Singh",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/a6/6e/bf/a66ebf79-5008-8948-b352-a790fc87446b/19UM1IM04638.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Blinding%20Lights%20The%20Weeknd&id=global_1",
   },
   {
-    id: "ind_5",
-    title: "Raataan Lambiyan",
-    artist: "Tanishk Bagchi, Jubin Nautiyal, Asees Kaur",
-    album: "Shershaah",
+    id: "global_2",
+    title: "As It Was",
+    artist: "Harry Styles",
+    album: "Harry's House",
+    duration: "2:47",
+    gradient: g("#f97316", "#db2777"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/2a/19/fb/2a19fb85-2f70-9e44-f2a9-82abe679b88e/886449990061.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=As%20It%20Was%20Harry%20Styles&id=global_2",
+  },
+  {
+    id: "global_3",
+    title: "Anti-Hero",
+    artist: "Taylor Swift",
+    album: "Midnights",
+    duration: "3:20",
+    gradient: g("#3b82f6", "#1e1b4b"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/3d/01/f2/3d01f2e5-5a08-835f-3d30-d031720b2b80/22UM1IM07364.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Anti%20Hero%20Taylor%20Swift&id=global_3",
+  },
+  {
+    id: "global_4",
+    title: "Levitating",
+    artist: "Dua Lipa",
+    album: "Future Nostalgia",
+    duration: "3:23",
+    gradient: g("#ec4899", "#8b5cf6"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Levitating%20Dua%20Lipa&id=global_4",
+  },
+  {
+    id: "global_5",
+    title: "Shape of You",
+    artist: "Ed Sheeran",
+    album: "÷ (Divide)",
+    duration: "3:53",
+    gradient: g("#10b981", "#047857"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/15/e6/e8/15e6e8a4-4190-6a8b-86c3-ab4a51b88288/190295851286.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Shape%20of%20You%20Ed%20Sheeran&id=global_5",
+  },
+  {
+    id: "global_6",
+    title: "Bad Guy",
+    artist: "Billie Eilish",
+    album: "When We All Fall Asleep, Where Do We Go?",
+    duration: "3:14",
+    gradient: g("#18181b", "#27272a"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/1a/37/d1/1a37d1b1-8508-54f2-f541-bf4e437dda76/19UMGIM05028.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Bad%20Guy%20Billie%20Eilish&id=global_6",
+  },
+  {
+    id: "global_7",
+    title: "Stay",
+    artist: "The Kid LAROI, Justin Bieber",
+    album: "F*CK LOVE 3",
+    duration: "2:21",
+    gradient: g("#06b6d4", "#3b82f6"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/89/59/6a/89596ab9-fa3c-8d08-4d95-a6450fa2013c/886449400515.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Stay%20The%20Kid%20LAROI%20Justin%20Bieber&id=global_7",
+  },
+  {
+    id: "global_8",
+    title: "Flowers",
+    artist: "Miley Cyrus",
+    album: "Endless Summer Vacation",
+    duration: "3:20",
+    gradient: g("#f59e0b", "#d97706"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/8c/67/ff/8c67ff91-31c3-3fef-1884-ce3ec89f3af4/196589946874.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Flowers%20Miley%20Cyrus&id=global_8",
+  },
+  {
+    id: "global_9",
+    title: "Starboy",
+    artist: "The Weeknd, Daft Punk",
+    album: "Starboy",
     duration: "3:50",
-    gradient: g("#c026d3", "#4c1d95"),
-    coverUrl: "https://c.saavncdn.com/238/Shershaah-Hindi-2021-20210816174950-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Raataan%20Lambiyan%20Jubin",
-  },
-  {
-    id: "ind_6",
-    title: "Satranga",
-    artist: "Arijit Singh, Shreyas Puranik",
-    album: "Animal",
-    duration: "4:31",
-    gradient: g("#b91c1c", "#18181b"),
-    coverUrl: "https://c.saavncdn.com/092/ANIMAL-Hindi-2023-20231124191136-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Satranga%20Animal%20Arijit",
-  },
-  {
-    id: "ind_7",
-    title: "Pehle Bhi Main",
-    artist: "Vishal Mishra, Raj Shekhar",
-    album: "Animal",
-    duration: "4:10",
-    gradient: g("#3f3f46", "#09090b"),
-    coverUrl: "https://c.saavncdn.com/092/ANIMAL-Hindi-2023-20231124191136-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Pehle%20Bhi%20Main%20Vishal%20Mishra",
-  },
-  {
-    id: "ind_8",
-    title: "Tauba Tauba",
-    artist: "Karan Aujla",
-    album: "Bad Newz",
-    duration: "3:28",
-    gradient: g("#eab308", "#ca8a04"),
+    gradient: g("#0f172a", "#334155"),
     coverUrl:
-      "https://c.saavncdn.com/282/Tauba-Tauba-From-Bad%20Newz-Hindi-2024-20240702111812-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Tauba%20Tauba%20Karan%20Aujla",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/b5/92/bb/b592bb72-52e3-e756-9b26-9f56d08f47ab/16UMGIM67864.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Starboy%20The%20Weeknd&id=global_9",
   },
 ];
 
@@ -389,56 +488,113 @@ export const recentlyAdded = madeForYou.concat([
 export const trendingTracks: Track[] = [
   {
     id: "tr1",
+    title: "Save Your Tears",
+    artist: "The Weeknd",
+    album: "After Hours",
+    duration: "3:35",
+    gradient: g("#dc2626", "#18181b"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/83/3a/f7/833af71b-2e0c-3303-24f5-8f5c546c073b/20UMGIM21167.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Save%20Your%20Tears%20The%20Weeknd&id=tr1",
+  },
+  {
+    id: "tr2",
+    title: "Cruel Summer",
+    artist: "Taylor Swift",
+    album: "Lover",
+    duration: "2:58",
+    gradient: g("#ec4899", "#f43f5e"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/49/3d/ab/493dab54-f920-9043-6181-80993b8116c9/19UMGIM53909.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Cruel%20Summer%20Taylor%20Swift&id=tr2",
+  },
+  {
+    id: "tr3",
+    title: "Watermelon Sugar",
+    artist: "Harry Styles",
+    album: "Fine Line",
+    duration: "2:54",
+    gradient: g("#f97316", "#eab308"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/2b/c4/c9/2bc4c9d4-3bc6-ab13-3f71-df0b89b173de/886448022213.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Watermelon%20Sugar%20Harry%20Styles&id=tr3",
+  },
+  {
+    id: "tr4",
+    title: "Peaches",
+    artist: "Justin Bieber, Daniel Caesar, Giveon",
+    album: "Justice",
+    duration: "3:18",
+    gradient: g("#f59e0b", "#ef4444"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e0/92/da/e092da2d-9f6d-11dc-7843-2021e95a2b61/21UMGIM17518.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Peaches%20Justin%20Bieber&id=tr4",
+  },
+  {
+    id: "tr5",
+    title: "Vampire",
+    artist: "Olivia Rodrigo",
+    album: "GUTS",
+    duration: "3:39",
+    gradient: g("#881337", "#4c0519"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/08/9e/07/089e0799-b405-9e69-b648-e6a19df9879c/24UMGIM30485.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Vampire%20Olivia%20Rodrigo&id=tr5",
+  },
+  {
+    id: "tr6",
     title: "Saiyaara",
     artist: "Tanishk Bagchi, Faheem Abdullah",
     album: "Saiyaara",
     duration: "4:12",
     gradient: g("#f97316", "#dc2626"),
-    coverUrl: "https://c.saavncdn.com/264/Saiyaara-Hindi-2024-20240212130005-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Saiyaara%20Tanishk%20Bagchi",
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/c6/6a/a3/c66aa366-4522-14b8-c629-7cfee5422fc0/Saiyaara_Album_Cover.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Saiyaara%20Faheem%20Abdullah&id=tr6",
   },
   {
-    id: "tr2",
+    id: "tr7",
     title: "Kesariya",
     artist: "Pritam, Arijit Singh",
     album: "Brahmastra",
     duration: "4:28",
-    gradient: g("#ff3d7f", "#ff9e5e", "#ffd66b"),
+    gradient: g("#ff6b35", "#f7931e"),
     coverUrl:
-      "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Kesariya%20Arijit%20Singh",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Kesariya%20Arijit%20Singh&id=tr7",
   },
   {
-    id: "tr3",
+    id: "tr8",
     title: "Softly",
     artist: "Karan Aujla, Ikky",
     album: "Making Memories",
     duration: "2:35",
-    gradient: g("#09090b", "#180828", "#4c1d95"),
-    coverUrl: "https://c.saavncdn.com/004/Softly-Punjabi-2023-20230801171802-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=Softly%20Karan%20Aujla",
+    gradient: g("#eab308", "#ca8a04"),
+    coverUrl:
+      "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/d3/08/bc/d308bc6a-20e1-6532-d933-35d1b429210e/5054197755538.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Softly%20Karan%20Aujla&id=tr8",
   },
   {
-    id: "tr4",
-    title: "O Maahi",
-    artist: "Arijit Singh, Pritam",
-    album: "Dunki",
-    duration: "3:53",
-    gradient: g("#1e1b4b", "#31108f", "#701a75"),
+    id: "tr9",
+    title: "Starboy",
+    artist: "The Weeknd, Daft Punk",
+    album: "Starboy",
+    duration: "3:50",
+    gradient: g("#0f172a", "#334155"),
     coverUrl:
-      "https://c.saavncdn.com/023/Dunki-Drop-2-O-Maahi-Hindi-2023-20231211171008-500x500.jpg",
-    audioUrl: "/api/stream/resolve?q=O%20Maahi%20Arijit%20Singh",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/b5/92/bb/b592bb72-52e3-e756-9b26-9f56d08f47ab/16UMGIM67864.rgb.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Starboy%20The%20Weeknd&id=tr9",
   },
   {
-    id: "tr5",
-    title: "Blinding Lights",
-    artist: "The Weeknd",
-    album: "After Hours",
-    duration: "3:20",
-    gradient: g("#00c6ff", "#0072ff"),
+    id: "tr10",
+    title: "Apna Bana Le",
+    artist: "Arijit Singh, Sachin-Jigar",
+    album: "Bhediya",
+    duration: "4:21",
+    gradient: g("#0284c7", "#1e1b4b"),
     coverUrl:
-      "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
-    audioUrl: "/api/stream/resolve?q=Blinding%20Lights%20The%20Weeknd",
+      "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/db/ad/5e/dbad5e8b-0bee-d962-92d4-021c90e375ac/8902894362092_cover.jpg/600x600bb.jpg",
+    audioUrl: "/api/stream/resolve?q=Apna%20Bana%20Le%20Arijit%20Singh&id=tr10",
   },
 ];
 

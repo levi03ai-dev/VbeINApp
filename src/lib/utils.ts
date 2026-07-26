@@ -114,14 +114,22 @@ export function applyTheme(themeId: string) {
   root.style.setProperty("--accent-pink", theme.accentPink);
 
   if (theme.isLight) {
-    root.style.setProperty("--foreground", "oklch(0.18 0.005 60)");
-    root.style.setProperty("--border", "oklch(0 0 0 / 8%)");
-    root.style.setProperty("--input", "oklch(0 0 0 / 6%)");
-    root.style.setProperty("--primary", "oklch(0.18 0.005 60)");
+    root.style.setProperty("--foreground", "oklch(0.18 0.01 60)");
+    root.style.setProperty("--card-foreground", "oklch(0.18 0.01 60)");
+    root.style.setProperty("--popover-foreground", "oklch(0.18 0.01 60)");
+    root.style.setProperty("--muted", "oklch(0.88 0.015 60)");
+    root.style.setProperty("--muted-foreground", "oklch(0.38 0.015 60)");
+    root.style.setProperty("--border", "oklch(0.2 0.01 60 / 12%)");
+    root.style.setProperty("--input", "oklch(0.2 0.01 60 / 8%)");
+    root.style.setProperty("--primary", "oklch(0.18 0.01 60)");
     root.style.setProperty("--primary-foreground", "oklch(0.97 0.005 60)");
   } else {
     root.style.setProperty("--foreground", "oklch(0.985 0.002 20)");
-    root.style.setProperty("--border", "oklch(1 0 0 / 8%)");
+    root.style.setProperty("--card-foreground", "oklch(0.985 0.002 20)");
+    root.style.setProperty("--popover-foreground", "oklch(0.985 0.002 20)");
+    root.style.setProperty("--muted", "oklch(0.22 0.007 20)");
+    root.style.setProperty("--muted-foreground", "oklch(0.68 0.015 20)");
+    root.style.setProperty("--border", "oklch(1 0 0 / 10%)");
     root.style.setProperty("--input", "oklch(1 0 0 / 12%)");
     root.style.setProperty("--primary", "oklch(0.985 0.002 20)");
     root.style.setProperty("--primary-foreground", "oklch(0.14 0.005 20)");

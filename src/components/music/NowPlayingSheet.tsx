@@ -2,6 +2,7 @@ import { AnimatePresence, motion, LayoutGroup, animate } from "framer-motion";
 import {
   GripVertical,
   Repeat,
+  Repeat1,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -11,6 +12,7 @@ import {
   MoreVertical,
   Star,
   Heart,
+  Bookmark,
   Download,
   Plus,
   ListPlus,
@@ -24,14 +26,17 @@ import {
   Music,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { usePlayer } from "@/lib/player-context";
+import { usePlayer, usePlaybackProgress } from "@/lib/player-context";
 import { activeLyricIndex, demoLyrics, getLyricsForTrack, useLyrics } from "@/lib/lyrics";
 import { duration as motionDuration, ease, spring } from "@/lib/motion";
 import { parseDurationToSeconds, formatSeconds } from "@/lib/utils";
 import { PlayPauseIcon } from "./PlayPauseIcon";
 import { AudioVisualizer } from "./AudioVisualizer";
+import { CoverImage } from "./CoverImage";
 import { downloadTrackFile } from "@/lib/music-service";
-import type { Track } from "@/lib/music-data";
+import { type Track, getCoverUrl } from "@/lib/music-data";
+import { globalAudioPlaybackManager } from "@/features/music/services/audio-playback-manager";
+import { Slider } from "@/components/ui/slider";
 import { Haptics } from "@/lib/haptics";
 import { toast } from "sonner";
 
@@ -39,7 +44,6 @@ type Panel = "player" | "lyrics" | "next";
 
 export function NowPlayingSheet() {
   const {
-    duration: playerDuration,
     nowPlayingOpen,
     closeNowPlaying,
     track,
@@ -47,11 +51,11 @@ export function NowPlayingSheet() {
     toggle,
     next,
     prev,
-    progress,
     seek,
     isFavorite,
     toggleFavorite,
   } = usePlayer();
+  const { duration: playerDuration, progress } = usePlaybackProgress();
   const [panel, setPanel] = useState<Panel>("player");
   const [showOptions, setShowOptions] = useState(false);
 
@@ -92,7 +96,7 @@ export function NowPlayingSheet() {
                 style={
                   track.coverUrl
                     ? {
-                        backgroundImage: `url(${track.coverUrl})`,
+                        backgroundImage: `url(${getCoverUrl(track.coverUrl)})`,
                         filter: "blur(60px) brightness(0.4) saturate(1.5)",
                         transform: "scale(1.2)",
                       }
@@ -123,7 +127,7 @@ export function NowPlayingSheet() {
                   className="absolute inset-0 rounded-full bg-cover bg-center"
                   style={
                     track.coverUrl
-                      ? { backgroundImage: `url(${track.coverUrl})` }
+                      ? { backgroundImage: `url(${getCoverUrl(track.coverUrl)})` }
                       : { background: track.gradient }
                   }
                 />
@@ -183,17 +187,11 @@ export function NowPlayingSheet() {
             {showOptions && track && (
               <OptionsSheet
                 track={track}
-                isFavorited={track ? isFavorite(track.id) : false}
+                isFavorited={track ? isFavorite(track) : false}
                 onToggleFavorite={() => {
                   if (!track) return;
                   Haptics.medium();
-                  const wasFavorited = isFavorite(track.id);
-                  toggleFavorite(track.id);
-                  if (!wasFavorited) {
-                    toast.success(`Added "${track.title}" to Favorites`);
-                  } else {
-                    toast.success(`Removed "${track.title}" from Favorites`);
-                  }
+                  toggleFavorite(track);
                 }}
                 onClose={() => setShowOptions(false)}
               />
@@ -240,14 +238,11 @@ function PlayerPanel({
   track: Track;
   onOpenOptions: () => void;
 }) {
-  const { isFavorite, toggleFavorite } = usePlayer();
+  const { isFavorite, toggleFavorite, repeatMode, toggleRepeat, shuffleActive, toggleShuffle } = usePlayer();
   const [isDownloading, setIsDownloading] = useState(false);
-  const [shuffleActive, setShuffleActive] = useState(false);
-  const [repeatActive, setRepeatActive] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  const safeCoverUrl =
-    track.coverUrl && !imgError ? track.coverUrl.trim().replace(/ /g, "%20") : null;
+  const safeCoverUrl = track.coverUrl && !imgError ? getCoverUrl(track.coverUrl) : null;
 
   // Use real audio duration if available, else fallback to track duration string
   const total = duration || parseDurationToSeconds(trackDuration);
@@ -297,16 +292,16 @@ function PlayerPanel({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.05 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 bg-cover bg-center"
-            style={
-              safeCoverUrl
-                ? { backgroundImage: `url("${safeCoverUrl}")` }
-                : { background: trackGradient }
-            }
+            className="absolute inset-0 flex items-center justify-center overflow-hidden"
+            style={{ background: trackGradient }}
           >
-            {track.coverUrl && !imgError && (
-              <img src={safeCoverUrl} alt="" className="hidden" onError={() => setImgError(true)} />
-            )}
+            <CoverImage
+              src={safeCoverUrl || undefined}
+              title={trackTitle}
+              artist={trackArtist}
+              iconSize={48}
+              className="h-full w-full object-cover z-0"
+            />
           </motion.div>
         </AnimatePresence>
       </motion.div>
@@ -335,22 +330,16 @@ function PlayerPanel({
           <button
             onClick={() => {
               Haptics.medium();
-              const wasFavorited = isFavorite(track.id);
-              toggleFavorite(track.id);
-              if (!wasFavorited) {
-                toast.success(`Added "${trackTitle}" to Favorites`);
-              } else {
-                toast.success(`Removed "${trackTitle}" from Favorites`);
-              }
+              toggleFavorite(track);
             }}
             className={`grid h-10 w-10 place-items-center rounded-full active:scale-90 transition-all ${
-              isFavorite(track.id)
+              isFavorite(track)
                 ? "bg-white/10 text-rose-500"
                 : "bg-white/5 hover:bg-white/10 text-white/80"
             }`}
             aria-label="Favorite"
           >
-            <Heart className="h-5 w-5" fill={isFavorite(track.id) ? "currentColor" : "none"} />
+            <Heart className="h-5 w-5" fill={isFavorite(track) ? "currentColor" : "none"} />
           </button>
           <button
             onClick={() => {
@@ -410,10 +399,7 @@ function PlayerPanel({
 
       <div className="mt-6 flex w-full items-center justify-between px-1">
         <IconBtn
-          onClick={() => {
-            setShuffleActive(!shuffleActive);
-            Haptics.medium();
-          }}
+          onClick={toggleShuffle}
         >
           <Shuffle
             className={`h-4 w-4 transition-colors duration-300 ${
@@ -443,18 +429,21 @@ function PlayerPanel({
           <SkipForward className="h-6 w-6 fill-current" />
         </IconBtn>
         <IconBtn
-          onClick={() => {
-            setRepeatActive(!repeatActive);
-            Haptics.medium();
-          }}
+          onClick={toggleRepeat}
         >
-          <Repeat
-            className={`h-4 w-4 transition-colors duration-300 ${
-              repeatActive
-                ? "text-accent stroke-[2.5px] opacity-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-                : "opacity-80"
-            }`}
-          />
+          {repeatMode === "one" ? (
+            <Repeat1
+              className="h-4 w-4 transition-colors duration-300 text-accent stroke-[2.5px] opacity-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+            />
+          ) : (
+            <Repeat
+              className={`h-4 w-4 transition-colors duration-300 ${
+                repeatMode === "queue"
+                  ? "text-accent stroke-[2.5px] opacity-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+                  : "opacity-80"
+              }`}
+            />
+          )}
         </IconBtn>
       </div>
 
@@ -483,25 +472,113 @@ function PlayerPanel({
 }
 
 function LyricsPanel({
-  progress,
   trackTitle,
   trackGradient,
   track,
   onBack,
 }: {
-  progress: number;
+  progress?: number;
   trackTitle: string;
   trackGradient: string;
   track: Track;
   onBack: () => void;
 }) {
-  const { duration } = usePlayer();
-  const trackLyrics = useLyrics(track, duration);
-  const idx = activeLyricIndex(progress, trackLyrics);
+  const { duration: progressDuration } = usePlaybackProgress();
+  const stableDuration = parseDurationToSeconds(track.duration) || progressDuration || 215;
+  const trackLyrics = useLyrics(track, stableDuration);
+  const { seek } = usePlayer();
+
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isManualScroll, setIsManualScroll] = useState(false);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let fallbackIntervalId: ReturnType<typeof setInterval> | null = null;
+
+    const tick = () => {
+      setCurrentTime(globalAudioPlaybackManager.getCurrentTime());
+      if (typeof document !== "undefined" && !document.hidden) {
+        animationFrameId = requestAnimationFrame(tick);
+      }
+    };
+
+    const startAdaptiveLoop = () => {
+      if (typeof document === "undefined") return;
+
+      if (!document.hidden) {
+        if (fallbackIntervalId) {
+          clearInterval(fallbackIntervalId);
+          fallbackIntervalId = null;
+        }
+        animationFrameId = requestAnimationFrame(tick);
+      } else {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        // Scaled-down adaptive polling interval when app is backgrounded / screen off
+        if (!fallbackIntervalId) {
+          fallbackIntervalId = setInterval(() => {
+            setCurrentTime(globalAudioPlaybackManager.getCurrentTime());
+          }, 2500);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      startAdaptiveLoop();
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+
+    startAdaptiveLoop();
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (fallbackIntervalId) clearInterval(fallbackIntervalId);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+    };
+  }, []);
+
+  const idx = activeLyricIndex(currentTime, trackLyrics);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLParagraphElement>(null);
   const touchStartRef = useRef<number | null>(null);
   const isAtTopRef = useRef<boolean>(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scrollAnimationRef = useRef<any>(null);
+
+  // Auto-center immediately when lyric index changes
+  useEffect(() => {
+    setIsManualScroll(false);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, [idx]);
+
+  // Clean up timer and animations on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (scrollAnimationRef.current) {
+        scrollAnimationRef.current.stop();
+        scrollAnimationRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleScroll = () => {
+    if (!isManualScroll) setIsManualScroll(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setIsManualScroll(false);
+    }, 3000);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -509,6 +586,12 @@ function LyricsPanel({
       const wrapper = container.firstElementChild;
       const activeEl = wrapper?.children[idx] as HTMLElement;
       if (activeEl) {
+        // Cancel any active animation first
+        if (scrollAnimationRef.current) {
+          scrollAnimationRef.current.stop();
+          scrollAnimationRef.current = null;
+        }
+
         // Small timeout to allow Framer Motion panel entry animations to settle so rect measurements are highly accurate
         const timer = setTimeout(() => {
           const containerRect = container.getBoundingClientRect();
@@ -517,23 +600,32 @@ function LyricsPanel({
           const relativeTop = activeRect.top - containerRect.top + container.scrollTop;
           const targetScrollTop = relativeTop - containerRect.height / 2 + activeRect.height / 2;
 
+          if (isManualScroll) return;
+
           // Animate the container scrollTop smoothly using framer-motion's animate function
-          const controls = animate(container.scrollTop, targetScrollTop, {
+          scrollAnimationRef.current = animate(container.scrollTop, targetScrollTop, {
             type: "spring",
-            stiffness: 80,
-            damping: 24,
-            mass: 0.8,
+            stiffness: 70,
+            damping: 22,
+            mass: 0.6,
             onUpdate: (value) => {
               container.scrollTop = value;
             },
+            onComplete: () => {
+              scrollAnimationRef.current = null;
+            },
           });
-
-          return () => controls.stop();
-        }, 50);
-        return () => clearTimeout(timer);
+        }, 40);
+        return () => {
+          clearTimeout(timer);
+          if (scrollAnimationRef.current) {
+            scrollAnimationRef.current.stop();
+            scrollAnimationRef.current = null;
+          }
+        };
       }
     }
-  }, [idx]);
+  }, [idx, isManualScroll]);
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const container = containerRef.current;
@@ -560,6 +652,12 @@ function LyricsPanel({
     isAtTopRef.current = false;
   };
 
+  const handleLineClick = (time: number) => {
+    if (stableDuration > 0) {
+      seek(time / stableDuration);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 32, filter: "blur(10px)" }}
@@ -568,52 +666,141 @@ function LyricsPanel({
       transition={{ duration: motionDuration.slow, ease: ease.soft }}
       className="flex flex-1 flex-col overflow-hidden"
     >
-      <PanelHeader
-        title={trackTitle}
-        subtitle="Lyrics"
-        onClose={onBack}
-        track={track}
-        showClose={false}
-      />
+      <PanelHeader title={trackTitle} subtitle="Lyrics" onClose={onBack} track={track} />
 
-      <div
-        ref={containerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className="no-scrollbar mt-4 flex-1 overflow-y-auto px-1 pb-8"
-      >
-        <div className="flex flex-col gap-6 py-[40vh]">
-          {trackLyrics.map((l, i) => {
-            const active = i === idx;
-            const passed = i < idx;
-            return (
-              <motion.p
-                key={i}
-                ref={active ? activeRef : undefined}
-                animate={{
-                  scale: active ? 1.04 : 0.96,
-                  opacity: active ? 1 : passed ? 0.35 : 0.25,
-                  y: active ? 0 : passed ? -8 : 8,
-                  filter: active ? "blur(0px)" : passed ? "blur(1px)" : "blur(1.6px)",
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 90,
-                  damping: 20,
-                  mass: 0.8,
-                }}
-                className={`text-left text-2xl md:text-3xl font-extrabold leading-snug tracking-tight transition-colors duration-300 min-h-[1.5em] ${
-                  active ? "text-white" : "text-white/50"
-                }`}
+      {/* Optimized scroll stage with beautiful clean UI UX */}
+      <div className="relative flex-1 overflow-hidden mt-2">
+        <div
+          ref={containerRef}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onWheel={handleScroll}
+          onTouchMoveCapture={handleScroll}
+          onMouseDownCapture={handleScroll}
+          className="no-scrollbar h-full overflow-y-auto px-4 pb-8"
+        >
+          <div
+            className={`flex flex-col gap-6 ${trackLyrics.length === 0 ? "h-full items-center justify-center py-0" : "py-[45vh]"}`}
+          >
+            {trackLyrics.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center text-white/50 py-12 px-6 flex flex-col items-center justify-center"
               >
-                {l.text || "\u00A0"}
-              </motion.p>
-            );
-          })}
+                <Music className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p className="text-lg font-medium">No lyrics available</p>
+                <p className="text-sm mt-1">We couldn't find lyrics for this track.</p>
+              </motion.div>
+            )}
+            {trackLyrics.map((l, i) => {
+              const active = i === idx;
+              const passed = i < idx;
+              return (
+                <motion.p
+                  key={i}
+                  ref={active ? activeRef : undefined}
+                  onClick={() => handleLineClick(l.t)}
+                  animate={{
+                    scale: active ? 1.05 : 0.95,
+                    opacity: active ? 1.0 : passed ? 0.55 : 0.35,
+                    y: active ? 0 : passed ? -4 : 4,
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 120,
+                    damping: 24,
+                    mass: 0.5,
+                  }}
+                  className={`cursor-pointer text-center text-2xl md:text-3xl font-extrabold leading-snug tracking-tight min-h-[1.5em] select-none ${
+                    active
+                      ? "text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
+                      : "text-white/40 hover:text-white/70"
+                  }`}
+                >
+                  {l.text || "\u00A0"}
+                </motion.p>
+              );
+            })}
+          </div>
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function SheetCapsulePlayer({ track }: { track: Track }) {
+  const { isPlaying, toggle, next, prev } = usePlayer();
+  const { progress } = usePlaybackProgress();
+
+  if (!track) return null;
+
+  return (
+    <div className="mx-4 mb-4 mt-2 shrink-0">
+      <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-full border border-white/10 bg-white/5 py-2 px-4 shadow-lg backdrop-blur-xl">
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <div 
+            className="h-8 w-8 shrink-0 rounded-full overflow-hidden shadow"
+            style={{ background: track.gradient }}
+          >
+            <CoverImage
+              src={track.coverUrl ? getCoverUrl(track.coverUrl) : undefined}
+              title={track.title}
+              artist={track.artist}
+              iconSize={14}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-bold tracking-tight text-white/90">
+              {track.title}
+            </p>
+            <p className="truncate text-[9px] text-white/60">
+              {track.artist}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              Haptics.light();
+              prev();
+            }}
+            className="grid h-7 w-7 place-items-center rounded-full text-white/80 hover:bg-white/5 active:scale-90 transition-colors"
+          >
+            <SkipBack className="h-3.5 w-3.5 fill-current" />
+          </button>
+          <button
+            onClick={() => {
+              Haptics.light();
+              toggle();
+            }}
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white hover:bg-white/15 active:scale-95 transition-colors"
+          >
+            <PlayPauseIcon isPlaying={isPlaying} size="sm" />
+          </button>
+          <button
+            onClick={() => {
+              Haptics.light();
+              next();
+            }}
+            className="grid h-7 w-7 place-items-center rounded-full text-white/80 hover:bg-white/5 active:scale-90 transition-colors"
+          >
+            <SkipForward className="h-3.5 w-3.5 fill-current" />
+          </button>
+        </div>
+
+        {/* Custom Progress Bar overlay */}
+        <div className="absolute inset-x-0 bottom-0 h-[2px] bg-white/5">
+          <div
+            className="h-full bg-white/30"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -647,15 +834,18 @@ function NextPanel({ onBack }: { onBack: () => void }) {
           </span>
           <div className="mt-2 flex items-center gap-3">
             <div
-              className="h-10 w-10 shrink-0 rounded-lg relative overflow-hidden flex items-center justify-center shadow-inner bg-cover bg-center"
-              style={
-                current.coverUrl
-                  ? { backgroundImage: `url(${current.coverUrl})` }
-                  : { background: current.gradient }
-              }
+              className="h-10 w-10 shrink-0 rounded-lg relative overflow-hidden flex items-center justify-center shadow-inner"
+              style={{ background: current.gradient }}
             >
-              <div className="absolute inset-0 bg-black/25" />
-              <div className="relative z-10">
+              <CoverImage
+                src={current.coverUrl ? getCoverUrl(current.coverUrl) : undefined}
+                title={current.title}
+                artist={current.artist}
+                iconSize={18}
+                className="absolute inset-0 h-full w-full object-cover z-0"
+              />
+              <div className="absolute inset-0 bg-black/25 z-10" />
+              <div className="relative z-20">
                 <AudioVisualizer isPlaying={isPlaying} colorClass="bg-white" />
               </div>
             </div>
@@ -692,13 +882,17 @@ function NextPanel({ onBack }: { onBack: () => void }) {
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
               >
                 <div
-                  className="h-9 w-9 shrink-0 rounded-lg bg-cover bg-center overflow-hidden"
-                  style={
-                    t.coverUrl
-                      ? { backgroundImage: `url(${t.coverUrl})` }
-                      : { background: t.gradient }
-                  }
-                />
+                  className="h-9 w-9 shrink-0 rounded-lg relative overflow-hidden shadow-sm"
+                  style={{ background: t.gradient }}
+                >
+                  <CoverImage
+                    src={t.coverUrl ? getCoverUrl(t.coverUrl) : undefined}
+                    title={t.title}
+                    artist={t.artist}
+                    iconSize={16}
+                    className="absolute inset-0 h-full w-full object-cover z-0"
+                  />
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium tracking-tight text-white">
                     {t.title}
@@ -748,40 +942,37 @@ function PanelHeader({
   subtitle,
   onClose,
   track,
-  showClose = true,
 }: {
   title: string;
   subtitle: string;
   onClose: () => void;
   track: Track;
-  showClose?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div
+      onClick={onClose}
+      className="flex items-center gap-3 cursor-pointer group hover:opacity-80 active:scale-[0.99] transition-all"
+    >
       <div
-        className="h-9 w-9 shrink-0 rounded-lg bg-cover bg-center cursor-pointer overflow-hidden"
-        style={
-          track.coverUrl
-            ? { backgroundImage: `url(${track.coverUrl})` }
-            : { background: track.gradient }
-        }
-        onClick={onClose}
-      />
+        className="h-9 w-9 shrink-0 rounded-lg relative overflow-hidden shadow-sm"
+        style={{ background: track.gradient }}
+      >
+        <CoverImage
+          src={track.coverUrl ? getCoverUrl(track.coverUrl) : undefined}
+          title={track.title}
+          artist={track.artist}
+          iconSize={16}
+          className="absolute inset-0 h-full w-full object-cover z-0"
+        />
+      </div>
       <div className="min-w-0 flex-1 text-left">
-        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/55 block">
+        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/55 block group-hover:text-white/75 transition-colors">
           {subtitle}
         </span>
-        <p className="truncate text-[15px] font-medium tracking-tight text-white">{title}</p>
+        <p className="truncate text-[15px] font-medium tracking-tight text-white group-hover:text-white/95 transition-colors">
+          {title}
+        </p>
       </div>
-      {showClose && (
-        <button
-          onClick={onClose}
-          aria-label="Back"
-          className="grid h-8.5 w-8.5 place-items-center rounded-full bg-white/10 text-white active:scale-90"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
     </div>
   );
 }
@@ -832,8 +1023,11 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
     "Late Night Focus",
     "Summer Beats",
   ]);
-  const { duration: playerDuration, sleepTimerRemaining, setSleepTimer } = usePlayer();
+  const { sleepTimerRemaining, setSleepTimer, toggleSaveTrack, isTrackSaved } = usePlayer();
+  const isSaved = track ? isTrackSaved(track) : false;
+  const { duration: playerDuration } = usePlaybackProgress();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [customSleepMins, setCustomSleepMins] = useState(30);
 
   // Handle Download Song
   const handleDownload = async () => {
@@ -861,12 +1055,12 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
   const handleShareSong = async () => {
     if (!track) return;
     Haptics.light();
-    const shareUrl = `https://sonora.music/track/${track.id}`;
+    const shareUrl = `https://vibein.music/track/${track.id}`;
     if (navigator.share) {
       try {
         await navigator.share({
           title: track.title,
-          text: `Listen to "${track.title}" by ${track.artist} on Sonora`,
+          text: `Listen to "${track.title}" by ${track.artist} on VibeIN`,
           url: shareUrl,
         });
         toast.success("Shared successfully");
@@ -950,10 +1144,10 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 280, damping: 28, mass: 0.9 }}
-        className="absolute inset-x-0 bottom-0 z-50 rounded-t-[28px] bg-white text-black dark:bg-zinc-900 dark:text-white p-6 pb-[max(env(safe-area-inset-bottom),1.5rem)] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pointer-events-auto"
+        className="absolute inset-x-0 bottom-0 z-50 rounded-t-[28px] bg-surface text-foreground p-6 pb-[max(env(safe-area-inset-bottom),1.5rem)] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden pointer-events-auto"
       >
         {/* Drag indicator/grab handle at top */}
-        <div className="mx-auto mb-4 h-1.5 w-12 shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-800" />
+        <div className="mx-auto mb-4 h-1.5 w-12 shrink-0 rounded-full bg-foreground/10" />
 
         {/* Dynamic sub-panels with nice slide-over transitions */}
         <div className="relative flex-1 flex flex-col overflow-hidden min-h-0">
@@ -975,18 +1169,16 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
                       background: track.gradient,
                     }}
                   >
-                    <div className="absolute inset-0 bg-black/5" />
-                    {track.coverUrl && (
-                      <img
-                        src={track.coverUrl}
-                        alt={track.title}
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
+                    <CoverImage
+                      src={track.coverUrl ? getCoverUrl(track.coverUrl) : undefined}
+                      title={track.title}
+                      artist={track.artist}
+                      iconSize={24}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <div className="min-w-0 flex-1 text-left">
-                    <h3 className="text-base font-bold tracking-tight text-neutral-900 dark:text-white truncate">
+                    <h3 className="text-base font-bold tracking-tight text-foreground truncate">
                       {track.title}
                     </h3>
                     <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
@@ -1001,13 +1193,17 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
                 {/* Option list scrollable */}
                 <div className="flex-1 overflow-y-auto no-scrollbar py-1">
                   <div className="flex flex-col gap-0.5">
-                    {/* Add to Library */}
+                    {/* Add / Save to Library */}
                     <OptionItem
-                      icon={<Plus className="h-4.5 w-4.5 text-rose-500" />}
-                      label="Add to Library"
+                      icon={
+                        <Bookmark
+                          className={`h-4.5 w-4.5 ${isSaved ? "text-indigo-500 fill-indigo-500" : "text-indigo-500"}`}
+                        />
+                      }
+                      label={isSaved ? "Remove from Saved Songs" : "Save to Library"}
                       onClick={() => {
-                        Haptics.success();
-                        toast.success(`Added "${track.title}" to Library`);
+                        Haptics.medium();
+                        toggleSaveTrack(track);
                         onClose();
                       }}
                     />
@@ -1071,15 +1267,57 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
 
                     <OptionItem
                       icon={<Moon className="h-4.5 w-4.5 text-rose-500" />}
-                      label="Sleep Timer Preset"
+                      label="Sleep Timer"
                       subText={
                         sleepTimerRemaining !== null
-                          ? `Timer active: ${Math.floor(sleepTimerRemaining / 60)}m remaining`
-                          : "Choose minutes to sleep"
+                          ? `Timer active: ${Math.floor(sleepTimerRemaining / 60)}:${(sleepTimerRemaining % 60).toString().padStart(2, "0")} remaining`
+                          : "Choose time to stop playback"
                       }
                     >
-                      <div className="flex gap-1.5 mt-2 ml-8 pb-1.5 overflow-x-auto no-scrollbar shrink-0">
-                        {sleepTimerRemaining !== null && (
+                      <div className="flex flex-col gap-4 mt-4 ml-8 pr-4 shrink-0">
+                        {sleepTimerRemaining === null ? (
+                          <>
+                            <div className="flex items-center justify-between text-sm font-medium">
+                              <span className="text-muted-foreground">Custom</span>
+                              <span className="text-foreground">{customSleepMins} min</span>
+                            </div>
+                            <Slider
+                              defaultValue={[30]}
+                              max={120}
+                              min={1}
+                              step={1}
+                              value={[customSleepMins]}
+                              onValueChange={(val) => {
+                                setCustomSleepMins(val[0]);
+                                Haptics.light();
+                              }}
+                            />
+                            <div className="flex gap-2 justify-between mt-2 overflow-x-auto no-scrollbar">
+                              {[15, 30, 45, 60].map((mins) => (
+                                <button
+                                  key={mins}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCustomSleepMins(mins);
+                                    handleSleepTimerSelect(mins);
+                                  }}
+                                  className="flex-1 rounded-full bg-foreground/5 hover:bg-rose-500 hover:text-white text-[11px] font-bold px-2 py-2 transition-colors shrink-0 text-foreground"
+                                >
+                                  {mins}m
+                                </button>
+                              ))}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSleepTimerSelect(customSleepMins);
+                              }}
+                              className="w-full mt-2 rounded-xl bg-rose-500 text-white font-bold text-sm py-2.5 active:scale-[0.98] transition-transform"
+                            >
+                              START TIMER
+                            </button>
+                          </>
+                        ) : (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1087,23 +1325,11 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
                               setSleepTimer(null);
                               toast.success("Sleep timer turned off");
                             }}
-                            className="rounded-full bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[11px] font-bold px-3 py-1 transition-colors shrink-0"
+                            className="rounded-xl bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-sm font-bold w-full py-2.5 transition-colors"
                           >
-                            Turn Off
+                            Turn Off Timer
                           </button>
                         )}
-                        {[10, 15, 30, 45, 60].map((mins) => (
-                          <button
-                            key={mins}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSleepTimerSelect(mins);
-                            }}
-                            className="rounded-full bg-neutral-100 hover:bg-rose-500 hover:text-white dark:bg-neutral-800 text-[11px] font-bold px-3 py-1 transition-colors shrink-0 text-black dark:text-neutral-200"
-                          >
-                            {mins}m
-                          </button>
-                        ))}
                       </div>
                     </OptionItem>
 
@@ -1250,7 +1476,7 @@ function OptionsSheet({ track, isFavorited, onToggleFavorite, onClose }: Options
                       Record Label & Distr.
                     </span>
                     <p className="font-medium text-neutral-700 dark:text-neutral-300 mt-0.5">
-                      Sonora Global Records Ltd. © 2026
+                      VibeIN Global Records Ltd. © 2026
                     </p>
                   </div>
                 </div>
@@ -1283,7 +1509,7 @@ function OptionItem({
       }}
       className={`w-full text-left flex flex-col justify-center rounded-xl p-3 transition-colors ${
         onClick
-          ? "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/60 active:bg-neutral-100 dark:active:bg-neutral-700/55 text-black dark:text-white"
+          ? "cursor-pointer hover:hover:bg-foreground/5 active:bg-foreground/10 text-foreground"
           : ""
       }`}
     >

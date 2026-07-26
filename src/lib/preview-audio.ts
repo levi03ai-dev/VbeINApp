@@ -30,7 +30,20 @@ export function getAnalyser(): AnalyserNode | null {
   if (!analyser) {
     analyser = c.createAnalyser();
     analyser.fftSize = 32; // Small fftSize is perfect for 5-8 bar minimalist visualizer
-    analyser.connect(c.destination);
+    // DO NOT connect to c.destination by default, to prevent double-routing Howler audio!
+    // analyser.connect(c.destination);
+
+    // Connect Howler master gain if available for real stream audio frequency sync
+    if (typeof window !== "undefined") {
+      const h = (window as unknown as { Howler?: { masterGain?: GainNode } }).Howler;
+      if (h?.masterGain) {
+        try {
+          h.masterGain.connect(analyser);
+        } catch {
+          /* ignore if already connected */
+        }
+      }
+    }
   }
   return analyser;
 }
@@ -93,6 +106,11 @@ export function playPreview(trackId: string, opts?: { seconds?: number; audioUrl
   const analyserNode = getAnalyser();
   if (analyserNode) {
     master.connect(analyserNode);
+    try {
+      analyserNode.connect(c.destination);
+    } catch {
+      /* ignore if already connected */
+    }
   } else {
     master.connect(c.destination);
   }

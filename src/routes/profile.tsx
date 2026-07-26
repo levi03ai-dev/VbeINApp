@@ -1,3 +1,10 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -26,7 +33,7 @@ function formatSeconds(sec: number): string {
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Profile & Settings — Sonora" },
+      { title: "Profile & Settings — VibeIN" },
       { name: "description", content: "Manage your music profile and custom playback settings." },
     ],
   }),
@@ -328,20 +335,18 @@ function ProfileAndSettings() {
                 Favorite Music Genre
               </label>
               <div className="relative mt-1">
-                <select
-                  value={favGenre}
-                  onChange={(e) => handleFavGenreChange(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-border bg-surface/30 px-3 py-2 text-[13px] text-foreground focus:border-accent/40 focus:outline-none"
-                >
-                  {GENRES.map((g) => (
-                    <option key={g} value={g} className="bg-surface text-foreground">
-                      {g}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-muted-foreground/60 text-[9px]">
-                  ▼
-                </div>
+                <Select value={favGenre} onValueChange={handleFavGenreChange}>
+                  <SelectTrigger className="w-full rounded-xl border border-border bg-surface/30 px-3 py-4 text-[13px] h-auto focus:ring-0 focus:ring-offset-0 focus:border-accent-pink/40 cursor-pointer">
+                    <SelectValue placeholder="Select a genre" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-surface/95 backdrop-blur-md border-border rounded-xl">
+                    {GENRES.map((g) => (
+                      <SelectItem key={g} value={g} className="text-[13px] cursor-pointer">
+                        {g}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -675,7 +680,7 @@ function ProfileAndSettings() {
 
       {/* App Info Footer */}
       <section className="px-4 text-center text-muted-foreground/50 mt-12 mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-widest">Sonora v1.4.2</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest">VibeIN v1.4.2</p>
         <p className="text-[9px] mt-1">Crafted with precision & care</p>
       </section>
     </div>

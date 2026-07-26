@@ -15,7 +15,7 @@ export function TabBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 glass-strong border-t border-border/40">
+    <nav className="pointer-events-auto fixed left-1/2 -translate-x-1/2 w-full max-w-md bottom-0 z-30 glass-strong border-t border-border/40">
       <ul className="mx-auto flex max-w-md items-stretch justify-between px-4 pt-2 pb-[max(env(safe-area-inset-bottom),0.5rem)]">
         {tabs.map(({ to, Icon }) => {
           const active = pathname === to;

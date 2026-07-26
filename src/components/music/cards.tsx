@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { usePlayer } from "@/lib/player-context";
-import type { Album, Playlist, Track } from "@/lib/music-data";
+import { usePlayer, isSameSong } from "@/lib/player-context";
+import { type Album, type Playlist, type Track, getCoverUrl } from "@/lib/music-data";
 import { spring } from "@/lib/motion";
-import { Heart, MoreVertical, Play, Plus } from "lucide-react";
+import { Bookmark, Heart, MoreVertical, Play, Plus } from "lucide-react";
+import { CoverImage } from "./CoverImage";
+import { AudioVisualizer } from "./AudioVisualizer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,43 +24,83 @@ export function ArtworkTile({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const [imgError, setImgError] = useState(false);
-  const safeCoverUrl = coverUrl && !imgError ? coverUrl.trim().replace(/ /g, "%20") : null;
+  const safeCoverUrl = coverUrl ? getCoverUrl(coverUrl) : null;
 
   return (
     <motion.div
       whileTap={{ scale: 0.95 }}
       whileHover={{ scale: 1.02 }}
       transition={spring.gentle}
-      className={`relative aspect-square overflow-hidden rounded-xl album-shadow bg-cover bg-center ${className}`}
-      style={
-        safeCoverUrl ? { backgroundImage: `url("${safeCoverUrl}")` } : { background: gradient }
-      }
+      className={`relative aspect-square overflow-hidden rounded-xl album-shadow ${className}`}
+      style={{
+        background: gradient,
+      }}
     >
-      {coverUrl && !imgError && (
-        <img src={safeCoverUrl} alt="" className="hidden" onError={() => setImgError(true)} />
-      )}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_60%_at_10%_0%,rgba(255,255,255,0.35),transparent_50%)]" />
-      {children}
+      <CoverImage
+        src={safeCoverUrl || undefined}
+        className="absolute inset-0 h-full w-full object-cover z-0"
+      />
+      <div className="absolute inset-0 z-10 bg-[radial-gradient(120%_60%_at_10%_0%,rgba(255,255,255,0.25),transparent_50%)] pointer-events-none" />
+      <div className="relative z-20 h-full w-full">{children}</div>
     </motion.div>
   );
 }
 
-export function AlbumCard({ album, wide = false }: { album: Album; wide?: boolean }) {
-  const { setTrack, openNowPlaying } = usePlayer();
+export function TrackCard({ track, wide = false }: { track: Track; wide?: boolean }) {
+  const { setTrack, openNowPlaying, setQueue } = usePlayer();
   return (
     <button
       onClick={() => {
-        setTrack({
-          id: album.id,
-          title: album.title,
-          artist: album.artist,
-          album: album.title,
-          duration: "3:42",
-          gradient: album.gradient,
-          coverUrl: album.coverUrl,
-        });
+        setTrack(track);
         openNowPlaying();
+      }}
+      className={`group flex flex-col text-left ${wide ? "w-[78vw] max-w-[320px]" : "w-full"}`}
+    >
+      <ArtworkTile gradient={track.gradient} coverUrl={track.coverUrl} />
+      <p className="mt-2 line-clamp-1 text-[13px] font-medium text-foreground tracking-tight">
+        {track.title}
+      </p>
+      <p className="line-clamp-1 text-[11px] text-muted-foreground/80">{track.artist}</p>
+    </button>
+  );
+}
+
+export function AlbumCard({ album, wide = false }: { album: Album; wide?: boolean }) {
+  const { setTrack, openNowPlaying, setQueue } = usePlayer();
+  return (
+    <button
+      onClick={async () => {
+        try {
+          const { searchTracks } = await import("@/lib/music-service");
+          const tracks = await searchTracks(album.title + " " + album.artist, 10);
+          if (tracks.length > 0) {
+            setQueue(tracks);
+            setTrack(tracks[0]);
+            openNowPlaying();
+          } else {
+            setTrack({
+              id: album.id,
+              title: album.title,
+              artist: album.artist,
+              album: album.title,
+              duration: "3:42",
+              gradient: album.gradient,
+              coverUrl: album.coverUrl,
+            });
+            openNowPlaying();
+          }
+        } catch {
+          setTrack({
+            id: album.id,
+            title: album.title,
+            artist: album.artist,
+            album: album.title,
+            duration: "3:42",
+            gradient: album.gradient,
+            coverUrl: album.coverUrl,
+          });
+          openNowPlaying();
+        }
       }}
       className={`group flex flex-col text-left ${wide ? "w-[78vw] max-w-[320px]" : "w-full"}`}
     >
@@ -72,20 +114,41 @@ export function AlbumCard({ album, wide = false }: { album: Album; wide?: boolea
 }
 
 export function PlaylistTile({ playlist }: { playlist: Playlist }) {
-  const { setTrack, openNowPlaying } = usePlayer();
+  const { setTrack, openNowPlaying, setQueue } = usePlayer();
   return (
     <button
-      onClick={() => {
-        setTrack({
-          id: playlist.id,
-          title: playlist.title,
-          artist: playlist.subtitle,
-          album: playlist.title,
-          duration: "3:20",
-          gradient: playlist.gradient,
-          coverUrl: playlist.coverUrl,
-        });
-        openNowPlaying();
+      onClick={async () => {
+        try {
+          const { searchTracks } = await import("@/lib/music-service");
+          const tracks = await searchTracks(playlist.title, 10);
+          if (tracks.length > 0) {
+            setQueue(tracks);
+            setTrack(tracks[0]);
+            openNowPlaying();
+          } else {
+            setTrack({
+              id: playlist.id,
+              title: playlist.title,
+              artist: playlist.subtitle,
+              album: playlist.title,
+              duration: "3:20",
+              gradient: playlist.gradient,
+              coverUrl: playlist.coverUrl,
+            });
+            openNowPlaying();
+          }
+        } catch {
+          setTrack({
+            id: playlist.id,
+            title: playlist.title,
+            artist: playlist.subtitle,
+            album: playlist.title,
+            duration: "3:20",
+            gradient: playlist.gradient,
+            coverUrl: playlist.coverUrl,
+          });
+          openNowPlaying();
+        }
       }}
       className="w-full text-left"
     >
@@ -109,15 +172,30 @@ export function TrackRow({
   index: number;
   onSelect?: () => void;
 }) {
-  const { setTrack, openNowPlaying, addToPlayNext, addToQueue, toggleFavorite, isFavorite } =
-    usePlayer();
-  const favorited = isFavorite(track.id);
-  const [imgError, setImgError] = useState(false);
-  const safeCoverUrl =
-    track.coverUrl && !imgError ? track.coverUrl.trim().replace(/ /g, "%20") : null;
+  const {
+    track: currentTrack,
+    isPlaying,
+    setTrack,
+    openNowPlaying,
+    addToPlayNext,
+    addToQueue,
+    toggleFavorite,
+    isFavorite,
+    toggleSaveTrack,
+    isTrackSaved,
+  } = usePlayer();
+
+  const isActive = isSameSong(track, currentTrack);
+  const favorited = isFavorite(track);
+  const saved = isTrackSaved(track);
+  const safeCoverUrl = track.coverUrl ? getCoverUrl(track.coverUrl) : null;
 
   return (
-    <div className="flex w-full items-center gap-3 rounded-xl py-1 px-2 hover:bg-foreground/5 transition-colors duration-200 group">
+    <div
+      className={`flex w-full items-center gap-3 rounded-xl py-1.5 px-2 hover:bg-foreground/5 transition-colors duration-200 group ${
+        isActive ? "bg-foreground/5" : ""
+      }`}
+    >
       <button
         onClick={() => {
           onSelect?.();
@@ -127,20 +205,29 @@ export function TrackRow({
         className="flex flex-1 items-center gap-3 text-left min-w-0 cursor-pointer"
       >
         <div
-          className="h-9 w-9 shrink-0 rounded-lg overflow-hidden relative bg-cover bg-center animate-fade-in"
-          style={
-            safeCoverUrl
-              ? { backgroundImage: `url("${safeCoverUrl}")` }
-              : { background: track.gradient }
-          }
+          className="h-9 w-9 shrink-0 rounded-lg overflow-hidden relative shadow-sm"
+          style={{ background: track.gradient }}
         >
-          {track.coverUrl && !imgError && (
-            <img src={safeCoverUrl} alt="" className="hidden" onError={() => setImgError(true)} />
+          <CoverImage
+            src={safeCoverUrl || undefined}
+            title={track.title}
+            artist={track.artist}
+            iconSize={16}
+            className="absolute inset-0 h-full w-full object-cover z-0"
+          />
+          <div className="absolute inset-0 z-10 bg-[radial-gradient(100%_50%_at_0%_0%,rgba(255,255,255,0.2),transparent_60%)] pointer-events-none" />
+          {isActive && (
+            <div className="absolute inset-0 z-20 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+              <AudioVisualizer isPlaying={isPlaying} colorClass="bg-rose-500" />
+            </div>
           )}
-          <div className="absolute inset-0 bg-[radial-gradient(100%_50%_at_0%_0%,rgba(255,255,255,0.2),transparent_60%)]" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold text-foreground tracking-tight">
+          <p
+            className={`truncate text-[13px] font-semibold tracking-tight ${
+              isActive ? "text-rose-500 font-bold" : "text-foreground"
+            }`}
+          >
             {track.title}
           </p>
           <p className="truncate text-[11px] text-muted-foreground mt-0.5">{track.artist}</p>
@@ -168,6 +255,15 @@ export function TrackRow({
               className={`h-3.5 w-3.5 ${favorited ? "fill-rose-500 text-rose-500" : "text-rose-500"}`}
             />
             <span>{favorited ? "Unlike Song" : "Like Song"}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => toggleSaveTrack(track)}
+            className="flex items-center gap-2 text-[12px] cursor-pointer"
+          >
+            <Bookmark
+              className={`h-3.5 w-3.5 ${saved ? "fill-indigo-500 text-indigo-500" : "text-indigo-500"}`}
+            />
+            <span>{saved ? "Remove from Saved" : "Save to Library"}</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => addToPlayNext(track)}

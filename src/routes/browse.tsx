@@ -1,14 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { featuredAlbums, genres, madeForYou, type Album, type Playlist } from "@/lib/music-data";
-import { AlbumCard, PlaylistTile, SectionHeader } from "@/components/music/cards";
+import {
+  featuredAlbums,
+  genres,
+  madeForYou,
+  seeAllAlbums,
+  seeAllPlaylists,
+  stations,
+  type Album,
+  type Playlist,
+  type Track,
+  getCoverUrl,
+} from "@/lib/music-data";
+import { AlbumCard, PlaylistTile, SectionHeader, TrackCard } from "@/components/music/cards";
+import { CoverImage } from "@/components/music/CoverImage";
 import { AlbumCardSkeleton, PlaylistTileSkeleton } from "@/components/music/CardSkeletons";
 import { Header, HScroll } from "./index";
 import { ScrollCarousel } from "@/components/music/ScrollCarousel";
 import { SeeAllSheet } from "@/components/music/SeeAllSheet";
 import { usePlayer } from "@/lib/player-context";
-import { getFeaturedAlbums, getCuratedPlaylists } from "@/lib/music-service";
+import { getFeaturedAlbums, getCuratedPlaylists, getPopularTracks, searchTracks } from "@/lib/music-service";
 import { getTracksByGenre } from "@/lib/music-service";
 import { Play } from "lucide-react";
 import { Haptics } from "@/lib/haptics";
@@ -16,7 +28,7 @@ import { Haptics } from "@/lib/haptics";
 export const Route = createFileRoute("/browse")({
   head: () => ({
     meta: [
-      { title: "Browse — Sonora" },
+      { title: "Browse — VibeIN" },
       { name: "description", content: "Explore new music, editorial spotlights, and every genre." },
     ],
   }),
@@ -26,6 +38,10 @@ export const Route = createFileRoute("/browse")({
 function Browse() {
   const [featured, setFeatured] = useState<Album[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [mixedForYou, setMixedForYou] = useState<Playlist[]>(madeForYou);
+  const [albumsForYou, setAlbumsForYou] = useState<Track[]>([]);
+  const [trendingPlaylists, setTrendingPlaylists] = useState<Playlist[]>([]);
+  const [similarAlbums, setSimilarAlbums] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { setTrack, openNowPlaying, setQueue } = usePlayer();
   const [activeSeeAll, setActiveSeeAll] = useState<{
@@ -37,12 +53,25 @@ function Browse() {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [fAlbums, pLists] = await Promise.all([
+        const [fAlbums, pLists, popular, arijitTracks] = await Promise.all([
           getFeaturedAlbums(10),
           getCuratedPlaylists(10),
+          getPopularTracks(10),
+          searchTracks("Arijit Singh", 10),
         ]);
         if (fAlbums && fAlbums.length > 0) setFeatured(fAlbums);
         if (pLists && pLists.length > 0) setPlaylists(pLists);
+        
+        if (popular && popular.length > 0) {
+          setAlbumsForYou([...popular].sort(() => 0.5 - Math.random()));
+        }
+        
+        if (arijitTracks && arijitTracks.length > 0) {
+          setSimilarAlbums([...arijitTracks].sort(() => 0.5 - Math.random()));
+        }
+
+        setMixedForYou([...madeForYou].sort(() => 0.5 - Math.random()));
+        setTrendingPlaylists([...seeAllPlaylists, ...madeForYou].sort(() => 0.5 - Math.random()));
       } catch (err) {
         console.error("Failed to load browse data:", err);
       } finally {
@@ -84,9 +113,8 @@ function Browse() {
       {/* Moods & Genres */}
       <section className="mt-8 px-4">
         <SectionHeader title="Moods & Genres" />
-        <div className="grid grid-cols-2 gap-3.5 mt-2 grid-flow-row-dense">
+        <div className="grid grid-cols-2 gap-3 mt-2 grid-flow-row-dense">
           {genres.map((g, i) => {
-            const isWide = i % 5 === 0;
             return (
               <motion.button
                 key={g.id}
@@ -106,7 +134,7 @@ function Browse() {
                       setTrack({
                         id: g.id + "-station",
                         title: `${g.name} Mix`,
-                        artist: "Sonora Station",
+                        artist: "VibeIN Station",
                         album: `${g.name} Radio`,
                         duration: "3:45",
                         gradient: g.gradient,
@@ -117,7 +145,7 @@ function Browse() {
                     setTrack({
                       id: g.id + "-station",
                       title: `${g.name} Mix`,
-                      artist: "Sonora Station",
+                      artist: "VibeIN Station",
                       album: `${g.name} Radio`,
                       duration: "3:45",
                       gradient: g.gradient,
@@ -125,20 +153,22 @@ function Browse() {
                     openNowPlaying();
                   }
                 }}
-                className={`relative overflow-hidden rounded-xl text-left album-shadow border border-white/10 cursor-pointer transition-all bg-cover bg-center ${
-                  isWide ? "col-span-2 aspect-[21/9]" : "col-span-1 aspect-square"
-                }`}
-                style={
-                  g.coverUrl
-                    ? { backgroundImage: `url(${g.coverUrl})` }
-                    : { background: g.gradient }
-                }
+                className="relative overflow-hidden rounded-lg text-left shadow-sm cursor-pointer transition-all h-14 col-span-1"
+                style={{
+                  background: g.gradient,
+                }}
               >
-                <div className="absolute inset-0 bg-black/35 z-0" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-                <span className="absolute bottom-3.5 left-3.5 text-[14px] font-semibold tracking-tight text-white z-20 drop-shadow-sm">
+                <div className="absolute inset-0 bg-black/10 z-10" />
+                <span className="absolute top-1/2 -translate-y-1/2 left-3 text-[13px] font-bold tracking-tight text-white z-20 drop-shadow-md">
                   {g.name}
                 </span>
+                {g.coverUrl && (
+                  <CoverImage
+                    src={getCoverUrl(g.coverUrl)}
+                    title={g.name}
+                    className="absolute right-[-15%] bottom-[-10%] h-12 w-12 object-cover rounded-md rotate-[25deg] shadow-md z-10"
+                  />
+                )}
               </motion.button>
             );
           })}
@@ -146,7 +176,7 @@ function Browse() {
       </section>
 
       {/* Curated collections */}
-      <section className="mt-8 pb-32">
+      <section className="mt-8">
         <SectionHeader
           title="Curated Collections"
           action="See All"
@@ -167,6 +197,54 @@ function Browse() {
                   <PlaylistTile playlist={p} />
                 </div>
               ))}
+        </HScroll>
+      </section>
+
+      {/* Mixed for you */}
+      <section className="mt-8">
+        <SectionHeader title="Mixed for you" />
+        <HScroll>
+          {mixedForYou.map((p) => (
+            <div key={p.id + "_mixed"} className="w-[42vw] max-w-[170px] shrink-0">
+              <PlaylistTile playlist={p} />
+            </div>
+          ))}
+        </HScroll>
+      </section>
+
+      {/* Albums for you */}
+      <section className="mt-8">
+        <SectionHeader title="Albums for you" />
+        <HScroll>
+          {albumsForYou.map((a) => (
+            <div key={a.id + "_albums"} className="w-[42vw] max-w-[170px] shrink-0">
+              <TrackCard track={a} />
+            </div>
+          ))}
+        </HScroll>
+      </section>
+
+      {/* Trending community playlists */}
+      <section className="mt-8">
+        <SectionHeader title="Trending community playlists" />
+        <HScroll>
+          {trendingPlaylists.map((p, idx) => (
+            <div key={p.id + "_trending_" + idx} className="w-[42vw] max-w-[170px] shrink-0">
+              <PlaylistTile playlist={p} />
+            </div>
+          ))}
+        </HScroll>
+      </section>
+
+      {/* Similar to Arijit Singh */}
+      <section className="mt-8 pb-32">
+        <SectionHeader title="Similar to Arijit Singh" />
+        <HScroll>
+          {similarAlbums.map((a, idx) => (
+            <div key={a.id + "_similar_" + idx} className="w-[42vw] max-w-[170px] shrink-0">
+              <TrackCard track={a} />
+            </div>
+          ))}
         </HScroll>
       </section>
 

@@ -1,44 +1,49 @@
 name: Build Android APK
-
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: "zulu"
           java-version: "17"
-
       - name: Install dependencies
-        run: npm ci
-
+        run: npm install
       - name: Build Web App
         run: npm run build
-
       - name: Sync Capacitor
         run: npx cap sync android
-
-      - name: Build APK
+      - name: Build APK (Debug)
         working-directory: android
         run: ./gradlew assembleDebug
-
-      - name: Upload APK
+      - name: Build APK (Release)
+        working-directory: android
+        run: ./gradlew assembleRelease
+      - name: Sign Release APK
+        working-directory: android/app/build/outputs/apk/release
+        run: |
+          keytool -genkey -v -keystore release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown" -storepass password -keypass password
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore release.keystore -storepass password app-release-unsigned.apk release
+          mv app-release-unsigned.apk app-release-signed.apk
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload Signed Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-signed.apk
+          path: android/app/build/outputs/apk/release/app-release-signed.apk

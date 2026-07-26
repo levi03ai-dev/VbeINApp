@@ -63,14 +63,14 @@ export function SeeAllSheet({
       className="fixed inset-0 z-40 bg-background flex flex-col pt-safe overflow-hidden"
     >
       {/* Header */}
-      <div className="pt-12 px-4 pb-3 border-b border-white/5 bg-background/50 backdrop-blur-xl sticky top-0 z-10 flex flex-col gap-3">
+      <div className="pt-12 px-4 pb-3 border-b border-border bg-background/95 backdrop-blur-md sticky top-0 z-10 flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
               Haptics.light();
               onClose();
             }}
-            className="h-9 w-9 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+            className="h-9 w-9 rounded-full bg-foreground/5 border border-border hover:bg-foreground/10 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
           >
             <ChevronLeft className="h-5 w-5 text-foreground" />
           </button>
@@ -90,7 +90,7 @@ export function SeeAllSheet({
               Haptics.light();
             }}
             placeholder={`Search in ${title.toLowerCase()}...`}
-            className="w-full bg-white/[0.04] border border-white/5 hover:bg-white/[0.07] focus:bg-white/[0.07] focus:border-white/10 rounded-xl py-2 pl-9 pr-9 text-[13px] text-foreground placeholder-muted-foreground outline-none transition-all"
+            className="w-full bg-foreground/5 border border-border hover:bg-foreground/10 focus:bg-foreground/10 focus:border-border rounded-xl py-2 pl-9 pr-9 text-[13px] text-foreground placeholder-muted-foreground outline-none transition-all"
           />
           {searchQuery && (
             <button
@@ -98,7 +98,7 @@ export function SeeAllSheet({
                 setSearchQuery("");
                 Haptics.light();
               }}
-              className="absolute right-3 h-5 w-5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+              className="absolute right-3 h-5 w-5 rounded-full bg-foreground/10 hover:bg-foreground/20 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
             >
               <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
             </button>

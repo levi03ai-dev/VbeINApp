@@ -33,7 +33,7 @@ export function TrackRowSkeleton() {
 
 export function HeroCardSkeleton() {
   return (
-    <div className="relative aspect-[16/10] w-[86vw] max-w-[450px] shrink-0 snap-center overflow-hidden rounded-2xl border border-white/5 bg-muted/30">
+    <div className="relative aspect-[16/10] w-[86vw] max-w-[450px] shrink-0 snap-center overflow-hidden rounded-2xl bg-muted/30">
       <div className="absolute inset-0 flex flex-col justify-end p-5 space-y-2">
         <Skeleton className="h-3 w-16 rounded bg-muted-foreground/20" />
         <Skeleton className="h-6 w-3/4 rounded bg-muted-foreground/20" />
@@ -50,7 +50,7 @@ export function HeroCardSkeleton() {
 export function GenreCardSkeleton({ wide = false }: { wide?: boolean }) {
   return (
     <Skeleton
-      className={`rounded-xl border border-white/10 bg-muted/40 ${
+      className={`rounded-xl bg-muted/40 ${
         wide ? "col-span-2 aspect-[21/9]" : "col-span-1 aspect-square"
       }`}
     />
