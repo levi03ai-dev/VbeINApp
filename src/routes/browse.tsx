@@ -8,6 +8,8 @@ import {
   seeAllAlbums,
   seeAllPlaylists,
   stations,
+  topCharts,
+  trendingTracks,
   type Album,
   type Playlist,
   type Track,
@@ -24,6 +26,7 @@ import { getFeaturedAlbums, getCuratedPlaylists, getPopularTracks, searchTracks 
 import { getTracksByGenre } from "@/lib/music-service";
 import { Play } from "lucide-react";
 import { Haptics } from "@/lib/haptics";
+import { globalCache } from "@/core/cache/cache-manager";
 
 export const Route = createFileRoute("/browse")({
   head: () => ({
@@ -49,40 +52,138 @@ function Browse() {
     title: string;
   } | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const [fAlbums, pLists, popular, arijitTracks] = await Promise.all([
-          getFeaturedAlbums(10),
-          getCuratedPlaylists(10),
-          getPopularTracks(10),
-          searchTracks("Arijit Singh", 10),
-        ]);
-        if (fAlbums && fAlbums.length > 0) setFeatured(fAlbums);
-        if (pLists && pLists.length > 0) setPlaylists(pLists);
-        
-        if (popular && popular.length > 0) {
-          setAlbumsForYou([...popular].sort(() => 0.5 - Math.random()));
-        }
-        
-        if (arijitTracks && arijitTracks.length > 0) {
-          setSimilarAlbums([...arijitTracks].sort(() => 0.5 - Math.random()));
-        }
+  const [pullProgress, setPullProgress] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-        setMixedForYou([...madeForYou].sort(() => 0.5 - Math.random()));
-        setTrendingPlaylists([...seeAllPlaylists, ...madeForYou].sort(() => 0.5 - Math.random()));
-      } catch (err) {
-        console.error("Failed to load browse data:", err);
-      } finally {
-        setIsLoading(false);
+  const loadData = async (refresh = false) => {
+    if (!refresh) setIsLoading(true);
+    try {
+      const [fAlbums, pLists, popular, arijitTracks] = await Promise.all([
+        getFeaturedAlbums(20),
+        getCuratedPlaylists(20),
+        getPopularTracks(40),
+        searchTracks("Arijit Singh", 30),
+      ]);
+      if (fAlbums && fAlbums.length > 0) {
+        setFeatured([...fAlbums].sort(() => 0.5 - Math.random()).slice(0, 10));
+      } else {
+        setFeatured([...featuredAlbums].sort(() => 0.5 - Math.random()).slice(0, 10));
       }
+
+      if (pLists && pLists.length > 0) {
+        setPlaylists([...pLists].sort(() => 0.5 - Math.random()).slice(0, 10));
+      } else {
+        setPlaylists([...madeForYou].sort(() => 0.5 - Math.random()).slice(0, 10));
+      }
+      
+      // Guarantee fallback to separate local arrays if API fails or returns identical sets
+      let finalPopular = popular || [];
+      let finalArijit = arijitTracks || [];
+
+      const isIdentical = finalPopular.length > 0 && 
+                          finalArijit.length > 0 && 
+                          finalPopular[0].id === finalArijit[0].id;
+
+      if (finalPopular.length === 0 || isIdentical) {
+        finalPopular = [...topCharts].sort(() => 0.5 - Math.random());
+      }
+      if (finalArijit.length === 0 || isIdentical) {
+        finalArijit = [...trendingTracks].sort(() => 0.5 - Math.random());
+      }
+
+      setAlbumsForYou([...finalPopular].sort(() => 0.5 - Math.random()).slice(0, 12));
+      setSimilarAlbums([...finalArijit].sort(() => 0.5 - Math.random()).slice(0, 12));
+
+      setMixedForYou([...madeForYou].sort(() => 0.5 - Math.random()));
+      setTrendingPlaylists([...seeAllPlaylists, ...madeForYou].sort(() => 0.5 - Math.random()));
+    } catch (err) {
+      console.error("Failed to load browse data:", err);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    let startY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (window.scrollY === 0) {
+        startY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (startY > 0 && window.scrollY === 0) {
+        const currentY = e.touches[0].clientY;
+        if (currentY > startY) {
+          const progress = Math.min((currentY - startY) / 100, 1);
+          setPullProgress(progress);
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (pullProgress > 0.8 && !isRefreshing) {
+        setIsRefreshing(true);
+        Haptics.heavy();
+        
+        globalCache.clear();
+        
+        loadData(true).finally(() => {
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullProgress(0);
+          }, 500);
+        });
+      } else {
+        setPullProgress(0);
+      }
+      startY = 0;
+    };
+
+    window.addEventListener("touchstart", handleTouchStart);
+    window.addEventListener("touchmove", handleTouchMove);
+    window.addEventListener("touchend", handleTouchEnd);
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [pullProgress, isRefreshing]);
+
   return (
-    <div className="pt-3">
+    <div className="pt-3 relative">
+      <AnimatePresence>
+        {(pullProgress > 0 || isRefreshing) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: pullProgress * 40 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-0 left-0 right-0 flex justify-center z-50 pointer-events-none"
+          >
+            <div className="bg-zinc-800 rounded-full p-2 shadow-lg flex items-center justify-center">
+              <svg
+                className={`w-5 h-5 text-zinc-400 ${isRefreshing ? "animate-spin" : ""}`}
+                style={{ transform: `rotate(${pullProgress * 360}deg)` }}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Header title="Browse" />
 
       {/* New this week */}

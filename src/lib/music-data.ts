@@ -16,10 +16,14 @@ export function getCoverUrl(url?: string): string {
   if (url.startsWith("/api/proxy/image") || url.startsWith("data:") || url.startsWith("/")) {
     return url;
   }
-  if (url.startsWith("http")) {
-    return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+  let secureUrl = url;
+  if (url.startsWith("http://")) {
+    secureUrl = url.replace("http://", "https://");
   }
-  return url;
+  if (secureUrl.startsWith("http")) {
+    return `/api/proxy/image?url=${encodeURIComponent(secureUrl)}`;
+  }
+  return secureUrl;
 }
 
 export function normalizeSongInfo(

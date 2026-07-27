@@ -165,6 +165,9 @@ export class JioSaavnProvider implements MusicProvider {
     let coverUrl = rawImage;
     if (typeof rawImage === "string") {
       coverUrl = rawImage.replace("150x150", "500x500");
+      if (coverUrl.startsWith("http://")) {
+        coverUrl = coverUrl.replace("http://", "https://");
+      }
     }
 
     let audioUrl = "";

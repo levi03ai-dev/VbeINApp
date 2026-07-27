@@ -95,17 +95,20 @@ body {
 }
 
 @utility glass {
-  background: color-mix(in oklab, var(--background) 40%, transparent);
-  backdrop-filter: saturate(180%) blur(28px);
+  background: color-mix(in oklab, var(--background) 75%, transparent);
+  -webkit-backdrop-filter: saturate(190%) blur(80px);
+  backdrop-filter: saturate(190%) blur(80px);
 }
 
 @utility glass-strong {
-  background: color-mix(in oklab, var(--background) 55%, transparent);
-  backdrop-filter: saturate(180%) blur(40px);
+  background: color-mix(in oklab, var(--background) 68%, transparent);
+  -webkit-backdrop-filter: saturate(220%) blur(140px);
+  backdrop-filter: saturate(220%) blur(140px);
 }
 
 @utility glass-card {
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
   backdrop-filter: saturate(160%) blur(20px);
   border: 1px solid var(--border);
 }

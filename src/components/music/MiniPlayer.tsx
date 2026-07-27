@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SkipForward, SkipBack } from "lucide-react";
 import { usePlayer, usePlaybackProgress } from "@/lib/player-context";
@@ -21,11 +22,20 @@ export function MiniPlayer() {
   } = usePlayer();
   const { progress } = usePlaybackProgress();
 
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  // Reset dismissed state when track changes
+  useEffect(() => {
+    if (track) {
+      setIsDismissed(false);
+    }
+  }, [track?.id]);
+
   const safeCoverUrl = track?.coverUrl ? getCoverUrl(track.coverUrl) : null;
 
   return (
     <AnimatePresence>
-      {track && !nowPlayingOpen && (
+      {track && !nowPlayingOpen && !isDismissed && (
         <motion.div
           layoutId="player-shell"
           initial={{ opacity: 0, y: 50, scale: 0.92, filter: "blur(4px)" }}
@@ -38,6 +48,7 @@ export function MiniPlayer() {
             if (info.offset.y < -35) {
               openNowPlaying();
             } else if (info.offset.y > 35) {
+              setIsDismissed(true);
               pause();
               setTrack(null);
             }
@@ -53,7 +64,7 @@ export function MiniPlayer() {
           transition={spring.sheet}
         >
           <div
-            className="bg-white/12 dark:bg-black/20 backdrop-blur-[40px] saturate-[210%] relative flex w-full items-center gap-3 overflow-hidden rounded-full border border-white/18 dark:border-white/5 pb-3 pt-1.5 pl-1.5 pr-4 text-left shadow-[0_12px_45px_rgba(0,0,0,0.15)] dark:shadow-[0_12px_45px_rgba(0,0,0,0.4)] cursor-pointer select-none"
+            className="glass-strong relative flex w-full items-center gap-3 overflow-hidden rounded-full border border-border/60 pb-3 pt-1.5 pl-1.5 pr-4 text-left shadow-[0_12px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)] cursor-pointer select-none"
           >
             {/* Circular vinyl disc rotating artwork (Only image rotates) */}
             <motion.div

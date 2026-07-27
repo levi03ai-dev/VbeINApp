@@ -1,4 +1,4 @@
-import { ProviderManager } from "./data/providers/ProviderManager";
+import { ProviderManager, globalProviderManager } from "./data/providers/ProviderManager";
 import { JioSaavnProvider } from "./data/providers/JioSaavnProvider";
 import { PipedProvider } from "./data/providers/PipedProvider";
 import { InvidiousProvider } from "./data/providers/InvidiousProvider";
@@ -8,7 +8,7 @@ import { StreamService } from "./services/StreamService";
 import { RecommendationService } from "./services/RecommendationService";
 
 // Initialize core components
-const providerManager = new ProviderManager();
+const providerManager = globalProviderManager;
 providerManager.registerProvider(new JioSaavnProvider());
 providerManager.registerProvider(new PipedProvider());
 providerManager.registerProvider(new InvidiousProvider());

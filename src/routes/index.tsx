@@ -34,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { Play, ChevronLeft, Search, X } from "lucide-react";
 import { Haptics } from "@/lib/haptics";
+import { globalCache } from "@/core/cache/cache-manager";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,6 +65,7 @@ function ListenNow() {
   const [featured, setFeatured] = useState<Album[]>([]);
   const [topPicks, setTopPicks] = useState<(Track & { tag?: string })[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [shuffledRecentlyAdded, setShuffledRecentlyAdded] = useState<Playlist[]>(recentlyAdded);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSeeAll, setActiveSeeAll] = useState<{
     id: "featured_albums" | "jump_back_in" | "trending_now" | "new_releases" | "recently_added";
@@ -72,6 +74,9 @@ function ListenNow() {
 
   useEffect(() => {
     async function loadData(refresh = false) {
+      if (refresh) {
+        globalCache.clear();
+      }
       if (!refresh) setIsLoading(true);
       try {
         const timeOfDay =
@@ -203,6 +208,7 @@ function ListenNow() {
         );
         setFeatured(allAlbums.slice(0, 10));
         setNewReleases(allAlbums.slice(10, 20));
+        setShuffledRecentlyAdded([...recentlyAdded].sort(() => 0.5 - Math.random()));
       } catch (err) {
         console.error("Failed to load homepage data:", err);
       } finally {
@@ -269,6 +275,17 @@ function ListenNow() {
       window.removeEventListener("touchend", handleTouchEnd);
     };
   }, [pullProgress, isRefreshing]);
+
+  const displayRecentlyAdded = [
+    ...savedAlbums.map((album) => ({
+      id: album.id,
+      title: album.title,
+      subtitle: album.artist,
+      gradient: album.gradient,
+      coverUrl: album.coverUrl,
+    })),
+    ...shuffledRecentlyAdded,
+  ];
 
   return (
     <div className="pt-3 relative">
@@ -589,8 +606,8 @@ function ListenNow() {
                   <PlaylistTileSkeleton />
                 </div>
               ))
-            : (playlists.length > 0 ? playlists : recentlyAdded).map((p) => (
-                <div key={p.id} className="w-[42vw] max-w-[170px] shrink-0">
+            : displayRecentlyAdded.map((p, idx) => (
+                <div key={p.id + "_recently_" + idx} className="w-[42vw] max-w-[170px] shrink-0">
                   <PlaylistTile playlist={p} />
                 </div>
               ))}

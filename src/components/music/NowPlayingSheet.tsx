@@ -490,6 +490,24 @@ function LyricsPanel({
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isManualScroll, setIsManualScroll] = useState(false);
+  const [offset, setOffset] = useState(() => {
+    try {
+      return parseFloat(localStorage.getItem(`lyrics_offset_${track.id}`) || "0");
+    } catch {
+      return 0;
+    }
+  });
+
+  const handleAdjustOffset = (adjustment: number) => {
+    const newOffset = Number((offset + adjustment).toFixed(1));
+    setOffset(newOffset);
+    try {
+      localStorage.setItem(`lyrics_offset_${track.id}`, newOffset.toString());
+    } catch (e) {
+      console.error(e);
+    }
+    Haptics.light();
+  };
 
   useEffect(() => {
     let animationFrameId: number;
@@ -543,7 +561,7 @@ function LyricsPanel({
     };
   }, []);
 
-  const idx = activeLyricIndex(currentTime, trackLyrics);
+  const idx = activeLyricIndex(currentTime + offset + 0.2, trackLyrics);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLParagraphElement>(null);
   const touchStartRef = useRef<number | null>(null);
@@ -725,6 +743,42 @@ function LyricsPanel({
             })}
           </div>
         </div>
+
+        {/* Floating Sync Controller */}
+        {trackLyrics.length > 0 && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-3.5 py-1.5 bg-black/45 border border-white/15 rounded-full backdrop-blur-md shadow-lg select-none">
+            <button 
+              onClick={() => handleAdjustOffset(-0.5)} 
+              className="text-xs font-bold text-white/75 hover:text-white h-7 w-7 rounded-full hover:bg-white/10 active:scale-90 transition flex items-center justify-center cursor-pointer"
+              title="Delay lyrics (if lyrics are ahead of music)"
+            >
+              -0.5
+            </button>
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] font-black uppercase tracking-wider text-white/40 leading-none">
+                Sync
+              </span>
+              <span className="text-[11px] font-extrabold text-accent leading-tight">
+                {offset === 0 ? "0.0s" : `${offset > 0 ? "+" : ""}${offset.toFixed(1)}s`}
+              </span>
+            </div>
+            <button 
+              onClick={() => handleAdjustOffset(0.5)} 
+              className="text-xs font-bold text-white/75 hover:text-white h-7 w-7 rounded-full hover:bg-white/10 active:scale-90 transition flex items-center justify-center cursor-pointer"
+              title="Advance lyrics (if lyrics are behind music)"
+            >
+              +0.5
+            </button>
+            {offset !== 0 && (
+              <button 
+                onClick={() => handleAdjustOffset(-offset)} 
+                className="text-[9px] font-bold text-red-400 hover:text-red-300 ml-1 px-1.5 py-0.5 hover:bg-red-500/10 border border-red-500/10 rounded-md transition cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
