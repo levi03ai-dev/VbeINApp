@@ -1,0 +1,12 @@
+# Force Git to treat all image files as binary to prevent CRLF line ending corruption on checkout/commit
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+
+# Ensure standard script file line endings are LF
+*.sh text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
