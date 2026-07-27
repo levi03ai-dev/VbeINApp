@@ -101,9 +101,9 @@ body {
 }
 
 @utility glass-strong {
-  background: color-mix(in oklab, var(--background) 68%, transparent);
-  -webkit-backdrop-filter: saturate(220%) blur(140px);
-  backdrop-filter: saturate(220%) blur(140px);
+  background: color-mix(in oklab, var(--background) 55%, transparent);
+  -webkit-backdrop-filter: saturate(280%) blur(160px);
+  backdrop-filter: saturate(280%) blur(160px);
 }
 
 @utility glass-card {
