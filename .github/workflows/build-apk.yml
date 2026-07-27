@@ -25,6 +25,9 @@ jobs:
         run: npm run build
       - name: Sync Capacitor
         run: npx cap sync android
+      - name: Restore Clean Gradle Wrapper Jar
+        run: |
+          curl -L -s -o android/gradle/wrapper/gradle-wrapper.jar "https://raw.githubusercontent.com/gradle/gradle/master/gradle/wrapper/gradle-wrapper.jar"
       - name: Make Gradlew Executable
         working-directory: android
         run: chmod +x gradlew
